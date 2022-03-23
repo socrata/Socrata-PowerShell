@@ -105,8 +105,8 @@ function Open-Revision {
     [OutputType([PSObject])]
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][String]$DatasetId,
-        [Parameter(Mandatory = $false)][ValidateSet("update", "replace")][String]$Type = "update",
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        [Parameter(Mandatory = $true)][ValidateSet("update", "replace")][String]$Type,
         [Parameter(Mandatory = $true)][String]$AuthString
     )
     Process {
@@ -153,7 +153,7 @@ function Set-Audience {
     [OutputType([PSObject])]
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][String]$DatasetId,
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][ValidateSet("private", "site", "public")][String] `
             $Audience,
         [Parameter(Mandatory = $true)][String]$AuthString
@@ -204,7 +204,7 @@ function Add-Source {
     [OutputType([PSObject])]
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][String]$DatasetId,
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][Int64]$RevisionId,
         [Parameter(Mandatory = $true)][String]$AuthString
     )
@@ -349,7 +349,7 @@ function Assert-SchemaSucceeded {
         $Headers = @{ "Authorization" = "Basic $AuthString" }
 
         # Send request
-        Write-Host "Checking whether output schema finished processing: $OutputSchemaUrl"
+        Write-Host "Checking whether dataset has finished processing: $OutputSchemaUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Get" `
             -Uri $OutputSchemaUrl `
@@ -372,7 +372,7 @@ function Assert-SchemaSucceeded {
         # Return Boolean representing whether schema finished processing with no column errors
         $SchemaSucceeded = $SchemaFinishedProcessing -and $NoColumnsFailed
         if (-not $SchemaSucceeded) {
-            throw "Output schema has not yet finished processing"
+            throw "Dataset has not yet finished processing"
         }
         $SchemaSucceeded
     }
@@ -402,7 +402,7 @@ function Publish-Revision {
     [OutputType([PSObject])]
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][String]$DatasetId,
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][Int64]$RevisionId,
         [Parameter(Mandatory = $true)][String]$AuthString
     )
@@ -427,20 +427,23 @@ function Publish-Revision {
 function Retry {
     <#
         .SYNOPSIS
-            Retry a function call, with exponential backoff each time the function throws an
-            error. Adapted from https://stackoverflow.com/a/57503237.
+            Retry a function call every 30 seconds
 
         .PARAMETER Action
             Function call to retry.
 
+        .PARAMETER Interval
+            Length of interval (in seconds) between attempts.
+
         .PARAMETER MaxAttempts
-            Maximum number of retries to attempt.
+            Maximum number of retries to attempt before giving up.
     #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([PSCustomObject])]
     Param(
         [Parameter(Mandatory = $true)][Action]$Action,
-        [Parameter(Mandatory = $false)][Int16]$MaxAttempts = 5
+        [Parameter(Mandatory = $false)][Int16]$Interval = 30,
+        [Parameter(Mandatory = $false)][Int16]$MaxAttempts = 2880
     )
     Process {
         $Attempts = 1
@@ -448,6 +451,7 @@ function Retry {
         $ErrorActionPreference = "Stop"
 
         do {
+            Write-Debug "Attempt $Attempts of $MaxAttempts"
             try {
                 $action.Invoke()
                 break
@@ -456,14 +460,11 @@ function Retry {
                 Write-Host $_.Exception.Message
             }
 
-            # Exponential backoff
+            # Retry after $Interval seconds
             $Attempts++
             if ($Attempts -le $MaxAttempts) {
-                $RetryDelaySeconds = [Math]::Pow(2, $Attempts) - 1  # Exponential backoff max == (2^n) - 1
-                Write-Host (
-                    "Failed; waiting $RetryDelaySeconds seconds before attempt $Attempts of ${MaxAttempts}"
-                )
-                Start-Sleep $RetryDelaySeconds
+                Write-Host "Retrying in $Interval seconds..."
+                Start-Sleep $Interval
             }
             else {
                 $ErrorActionPreference = $ErrorActionPreferenceToRestore
@@ -520,6 +521,7 @@ function New-Dataset {
             -ErrorAction "Stop"
         [String]$DatasetId = $Revision.resource.fourfour
         [Int64]$RevisionId = $Revision.resource.revision_seq
+        [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
         # Set audience on revision
         [PSObject]$Revision = Set-Audience `
@@ -557,6 +559,112 @@ function New-Dataset {
                 -ErrorAction "Stop"
         }
 
+        # Get latest input schema based on highest ID
+        try {
+            [Array]$SortedInputSchemas = $Upload.resource.schemas | Sort-Object `
+                -Property "id" `
+                -Descending
+            [Int64]$LatestInputSchemaId = $SortedInputSchemas[0].id
+        }
+        catch [Exception] {
+            throw "Failed to obtain ID for latest input schema; halting execution"
+        }
+
+        # Wait for schema to finish processing
+        Retry `
+            -Action { Assert-SchemaSucceeded `
+                -Domain $Domain `
+                -SourceId $SourceId `
+                -InputSchemaId $LatestInputSchemaId `
+                -AuthString $AuthString `
+                -ErrorAction "Stop" } `
+            -ErrorAction "Stop"
+
+        # Publish revision
+        Publish-Revision `
+            -Domain $Domain `
+            -DatasetId $DatasetId `
+            -RevisionId $RevisionId `
+            -AuthString $AuthString
+        Write-Host "View publication status: $RevisionUrl"
+        $RevisionUrl
+    }
+}
+
+function Update-Dataset {
+    <#
+        .SYNOPSIS
+            Update an existing dataset on a Socrata domain by uploading a file.
+
+        .PARAMETER Domain
+            URL for a Socrata domain.
+
+        .PARAMETER DatasetId
+            Unique identifier (4x4) for a Socrata dataset.
+
+        .PARAMETER Type
+            Revision type ("update" or "replace").
+
+        .PARAMETER Filepath
+            Path representing the data file to upload.
+
+        .PARAMETER Filetype
+            Filetype for the data file to upload ("csv", "tsv", "xls", "xlsx", "shapefile", "kml",
+            or "geojson").
+
+        .OUTPUTS
+            String
+    #>
+    [CmdletBinding(PositionalBinding = $false)]
+    [OutputType([PSObject])]
+    Param(
+        [Parameter(Mandatory = $true)][String]$Domain,
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        [Parameter(Mandatory = $true)][ValidateSet("update", "replace")][String]$Type,
+        [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
+        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson")][String]$Filetype = $null
+    )
+    Process {
+        # Get auth string
+        [String]$AuthString = Get-AuthString -ErrorAction "Stop"
+
+        # Create revision
+        [PSObject]$Revision = Open-Revision `
+            -Domain $Domain `
+            -DatasetId $DatasetId `
+            -Type $Type `
+            -AuthString $AuthString `
+            -ErrorAction "Stop"
+        [Int64]$RevisionId = $Revision.resource.revision_seq
+        [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
+
+        # Create source on revision
+        [PSObject]$Source = Add-Source `
+            -Domain $Domain `
+            -DatasetId $DatasetId `
+            -RevisionId $RevisionId `
+            -AuthString $AuthString `
+            -ErrorAction "Stop"
+        [Int64]$SourceId = $Source.resource.id
+
+        # Upload file to source
+        if ($null -eq $Filetype -or $Filetype -eq "") {
+            [PSObject]$Upload = Add-Upload `
+                -Domain $Domain `
+                -SourceId $SourceId `
+                -Filepath $Filepath `
+                -AuthString $AuthString `
+                -ErrorAction "Stop"
+        }
+        else {
+            [PSObject]$Upload = Add-Upload `
+                -Domain $Domain `
+                -SourceId $SourceId `
+                -Filepath $Filepath `
+                -Filetype $Filetype `
+                -AuthString $AuthString `
+                -ErrorAction "Stop"
+        }
 
         # Get latest input schema based on highest ID
         try {
@@ -577,7 +685,6 @@ function New-Dataset {
                 -InputSchemaId $LatestInputSchemaId `
                 -AuthString $AuthString `
                 -ErrorAction "Stop" } `
-            -MaxAttempts 12 `
             -ErrorAction "Stop"
 
         # Publish revision
@@ -586,6 +693,7 @@ function New-Dataset {
             -DatasetId $DatasetId `
             -RevisionId $RevisionId `
             -AuthString $AuthString
-        Write-Host "View publication status: https://$Domain/d/$DatasetId/revisions/$RevisionId"
+        Write-Host "View publication status: $RevisionUrl"
+        $RevisionUrl
     }
 }
