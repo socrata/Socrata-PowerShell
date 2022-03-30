@@ -1,5 +1,5 @@
 <#
-    Socrata.psm1
+    Socrata-PowerShell
 #>
 
 #Requires -Version 5.1
