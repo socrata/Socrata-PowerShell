@@ -9,10 +9,10 @@ A PowerShell module for creating and updating datasets on a Socrata domain via t
 
 To install this module:
 
-1. Download this repository as a ZIP, or clone it locally using `git clone`
+1. Download this repository as a ZIP or `git clone` it locally
 2. Unzip the repository, if necessary
 3. Move the `Socrata-PowerShell` directory to wherever you'd like to keep it
-4. [Import the module] in your PowerShell scripts like so: `Import-Module -Name "./Socrata-PowerShell/Socrata"`
+4. [Import the module] in your PowerShell scripts like so: `Import-Module -Name "./Socrata-PowerShell/Socrata.psm1"`
 
 Be sure to edit the `-Name` parameter value so it points to the correct path for the `Socrata.psm1` file in your environment.
 
@@ -26,7 +26,7 @@ For detailed information on installing PowerShell modules locally and globally, 
 Here's a simple PowerShell script that performs a full replace on an existing dataset from a CSV file:
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata" -Function "Update-Dataset"
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
 Write-Host "Updating dataset..."
 
@@ -42,7 +42,7 @@ Write-Host "Update complete!"
 
 ## Authentication
 
-To use this library, you must have access to a Socrata user account with permissions to create and/or update datasets on your domain.
+To use this library, you must have access to a Socrata user account with permissions to create and/or update datasets on a Socrata domain.
 
 While the `New-Dataset` and `Update-Dataset` functions will accept a Socrata username and password, it's best to [generate a pair of API keys] and use those instead.
 
@@ -67,7 +67,7 @@ Reminder: do not store your secure credentials in a script or commit them to ver
 ### Update an existing dataset
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata" -Function "Update-Dataset"
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
 $Url = Update-Dataset `
     -Domain "data.example.gov" `                   # Required
@@ -85,7 +85,7 @@ $Url = Update-Dataset `
 Warning: when creating a new dataset programmatically, it's very common to run into data quality errors and schema issues. As a result, it's usually better to create a new dataset using the [Data Management Experience] user interface, implement any desired schema changes, metadata additions, etc., and then publish. You can then schedule programmatic [updates] for the dataset going forward.
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata" -Function "New-Dataset"
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
 
 $Url = New-Dataset `
     -Domain "data.example.gov" `                   # Required
@@ -100,6 +100,24 @@ $Url = New-Dataset `
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
 [updates]: #update-an-existing-dataset
+
+### Create a dataset draft without publishing it
+
+It is often desired to create a draft revision of a new or existing dataset without publishing the draft. For example, you may want to manually inspect a dataset in the [Data Management Experience] user interface before publishing.
+
+The functions `Update-Dataset` and `New-Dataset` both accept a `-Publish` parameter that, when set to `$false`, will leave the revision in draft (unpublished) state.
+
+```powershell
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
+
+$Url = New-Dataset `
+    -Domain "data.example.gov" `                   # Required
+    -Name "Assisted Living Facilities" `           # Required
+    -Filepath "datasets\assisted_living.csv" `     # Required
+    -Publish $false `                              # Optional; $true or $false (default: $true)
+```
+
+[Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
 
 ## Other resources
 
