@@ -9,7 +9,7 @@ A PowerShell module for creating and updating datasets on a Socrata domain via t
 
 To install this module:
 
-1. Download this repository as a ZIP or `git clone` it locally
+1. Download this repository [as a ZIP] or `git clone` it locally
 2. Unzip the repository, if necessary
 3. Move the `Socrata-PowerShell` directory to wherever you'd like to keep it
 4. [Import the module] in your PowerShell scripts like so: `Import-Module -Name "./Socrata-PowerShell/Socrata.psm1"`
@@ -18,6 +18,7 @@ Be sure to edit the `-Name` parameter value so it points to the correct path for
 
 For detailed information on installing PowerShell modules locally and globally, see [Installing a PowerShell Module].
 
+[as a ZIP]: https://github.com/socrata/Socrata-PowerShell/archive/refs/heads/main.zip
 [Import the module]: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/import-module
 [Installing a PowerShell Module]: https://docs.microsoft.com/en-us/powershell/scripting/developer/module/installing-a-powershell-module
 
