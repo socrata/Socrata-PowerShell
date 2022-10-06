@@ -47,16 +47,21 @@ To use this library, you must have access to a Socrata user account with permiss
 
 While the `New-Dataset` and `Update-Dataset` functions will accept a Socrata username and password, it's best to [generate a pair of API keys] and use those instead.
 
-By default, this library will automatically look for Socrata credentials under the environment variables `SOCRATA_USERNAME` and `SOCRATA_PASSWORD`. However, you can also supply them explicitly:
+By default, this library will automatically look for Socrata credentials under the environment variables `SOCRATA_USERNAME` and `SOCRATA_PASSWORD`. However, you can also supply them explicitly. Note that the password passed in must be a `SecureString`:
 
 ```powershell
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
+
+$SocrataUsername = $Env:API_KEY_ID
+$SocrataPassword = $Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force
+
 Update-Dataset `
     -Domain "data.example.gov" `
     -DatasetId "fej7-9vb3" `
     -Type "replace" `
     -Filepath "\\treasurer\financial_data\budget.csv" `
-    -SocrataUsername $Env:API_KEY_ID `
-    -SocrataPassword $Env:API_KEY_SECRET
+    -SocrataUsername $SocrataUsername `
+    -SocrataPassword $SocrataPassword
 ```
 
 Reminder: do not store your secure credentials in a script or commit them to version control.
@@ -70,6 +75,9 @@ Reminder: do not store your secure credentials in a script or commit them to ver
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
+$SocrataUsername = $Env:API_KEY_ID
+$SocrataPassword = $Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force
+
 $Url = Update-Dataset `
     -Domain "data.example.gov" `                   # Required
     -DatasetId "c2xb-y8f6" `                       # Required
@@ -77,8 +85,8 @@ $Url = Update-Dataset `
     -Filepath "C:\Documents\vet_facils.geojson" `  # Required
     -Filetype "geojson" `                          # Optional; if not supplied, this is guessed from the filepath
     -Publish $true `                               # Optional; $true or $false (default: $true)
-    -SocrataUsername $Env:API_KEY_ID `             # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
-    -SocrataPassword $Env:API_KEY_SECRET           # Optional; if not supplied, this is looked up from the env variable SOCRATA_PASSWORD
+    -SocrataUsername $SocrataUsername `            # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
+    -SocrataPassword $SocrataPassword              # Optional; if not supplied, this is looked up from the env variable SOCRATA_PASSWORD
 ```
 
 ### Create a new dataset
@@ -88,6 +96,9 @@ Warning: when creating a new dataset programmatically, it's very common to run i
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
 
+$SocrataUsername = $Env:API_KEY_ID
+$SocrataPassword = $Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force
+
 $Url = New-Dataset `
     -Domain "data.example.gov" `                   # Required
     -Name "Hospital Bed Availability by County" `  # Required
@@ -95,8 +106,8 @@ $Url = New-Dataset `
     -Filetype "xlsx" `                             # Optional; if not supplied, this is guessed from the filepath
     -Audience "private" `                          # Optional; "private" or "public" (default: "private")
     -Publish $true `                               # Optional; $true or $false (default: $true)
-    -SocrataUsername $Env:API_KEY_ID `             # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
-    -SocrataPassword $Env:API_KEY_SECRET           # Optional; if not supplied, this is looked up from the env variable SOCRATA_PASSWORD
+    -SocrataUsername $SocrataUsername `            # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
+    -SocrataPassword $SocrataPassword              # Optional; if not supplied, this is looked up from the env variable SOCRATA_PASSWORD
 ```
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
