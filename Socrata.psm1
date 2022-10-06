@@ -24,6 +24,12 @@ function Get-SocrataCredentials {
             Obtain Socrata credentials from the local env variables SOCRATA_USERNAME and
             SOCRATA_PASSWORD.
 
+        .PARAMETER SocrataUsername
+            Socrata username or API key identifier.
+
+        .PARAMETER SocrataPassword
+            Socrata password or API key secret.
+
         .OUTPUTS
             PSCredential
     #>
