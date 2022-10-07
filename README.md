@@ -52,8 +52,8 @@ By default, this package will automatically look for Socrata credentials under t
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
 $Credentials = New-Object PSCredential(
-    $Env:API_KEY_ID,
-    ($Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+    $Env:SOCRATA_KEY_ID,
+    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
 )
 
 Update-Dataset `
@@ -75,7 +75,7 @@ As a reminder, do not store secure credentials in a script or commit them to ver
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
-$Credentials =  New-Object PSCredential(
+$Credentials = New-Object PSCredential(
     $Env:SOCRATA_KEY_ID,
     ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
 )
@@ -97,9 +97,9 @@ Warning: when creating a new dataset programmatically, it's very common to run i
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
 
-$Credentials =  New-Object PSCredential(
-    $Env:API_KEY_ID,
-    ($Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+$Credentials = New-Object PSCredential(
+    $Env:SOCRATA_KEY_ID,
+    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
 )
 
 $Url = New-Dataset `
@@ -128,7 +128,7 @@ $Url = New-Dataset `
     -Domain "data.example.gov" `                   # Required
     -Name "Assisted Living Facilities by State" `  # Required
     -Filepath "datasets\assisted_living.csv" `     # Required
-    -Publish $false `                              # Optional; $true or $false (default: $true)
+    -Publish $false                                # Optional; $true or $false (default: $true)
 ```
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
