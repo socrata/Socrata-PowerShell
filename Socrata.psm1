@@ -406,15 +406,17 @@ function Assert-SchemaSucceeded {
 
         # Prepare HTTP request to upload file to a revision source
         $OutputSchemaUrl = "https://$Domain/api/publishing/v1/source/$SourceId/schema/$InputSchemaId/output/latest"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
+        $Headers = @{
+            "Authorization" = "Basic $AuthString"
+            "Accept" = "application/json"
+        }
 
         # Send request
         Write-Host "Checking whether dataset has finished processing: $OutputSchemaUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Get" `
             -Uri $OutputSchemaUrl `
-            -Headers $Headers `
-            -ContentType "application/json"
+            -Headers $Headers
 
         # Determine whether schema finished processing
         $SchemaFinishedProcessing = -not [String]::IsNullOrEmpty($ResponseJson.resource.finished_at)
