@@ -47,7 +47,7 @@ function Get-SocrataCredentials {
     )
     Process {
         if (-not $Credentials) {
-            Write-Debug "Failed to obtain Socrata credentials from parameters; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+            Write-Debug "Failed to obtain Socrata credentials from parameter; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
             $SocrataUsername = $Env:SOCRATA_USERNAME
             $SocrataPassword = ConvertTo-SecureString -String $Env:SOCRATA_PASSWORD -AsPlainText -Force
 
@@ -60,7 +60,7 @@ function Get-SocrataCredentials {
             New-Object PSCredential($SocrataUsername, $SocrataPassword)
         }
         else {
-            Write-Debug "Obtained Socrata credentials"
+            Write-Verbose "Obtained Socrata credentials"
             $Credentials
         }
     }
@@ -107,7 +107,7 @@ function New-Revision {
         } | ConvertTo-Json -Compress
 
         # Send request and return response JSON object
-        Write-Host "Creating new revision: $RevisionUrl"
+        Write-Verbose "Creating new revision: $RevisionUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Post" `
             -Uri $RevisionUrl `
@@ -158,7 +158,7 @@ function Open-Revision {
         } | ConvertTo-Json -Compress
 
         # Send request and return response JSON object
-        Write-Host "Creating new revision: $RevisionUrl"
+        Write-Verbose "Creating new revision: $RevisionUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Post" `
             -Uri $RevisionUrl `
@@ -215,7 +215,7 @@ function Set-Audience {
         } | ConvertTo-Json -Compress
 
         # Send request and return response JSON object
-        Write-Host "Setting audience: $AudienceUrl"
+        Write-Verbose "Setting audience: $AudienceUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Put" `
             -Uri $AudienceUrl `
@@ -275,7 +275,7 @@ function Add-Source {
         } | ConvertTo-Json -Compress
 
         # Send request and return response JSON object
-        Write-Host "Creating new source: $SourceUrl"
+        Write-Verbose "Creating new source: $SourceUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Post" `
             -Uri $SourceUrl `
@@ -341,10 +341,10 @@ function Add-Upload {
             "json"      = "application/vnd.geo+json"
         }
         if (-not $Filetype) {
-            Write-Host "No filetype specified; attempting to infer content type from extension"
+            Write-Verbose "No filetype specified; attempting to infer content type from extension"
             $FileExtension = [System.IO.Path]::GetExtension($Filepath).ToLower().Substring(1)
             $ContentType = $ContentTypeMappings.$FileExtension
-            Write-Host "Inferred content type '$ContentType' from extension '$FileExtension'"
+            Write-Warning "Inferred content type '$ContentType' from extension '$FileExtension'"
         }
         else {
             $ContentType = $ContentTypeMappings.$Filetype
@@ -357,7 +357,7 @@ function Add-Upload {
         }
 
         # Send request and return response JSON object
-        Write-Host "Uploading file to source: $SourceUploadUrl"
+        Write-Verbose "Uploading file to source: $SourceUploadUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Post" `
             -Uri $SourceUploadUrl `
@@ -412,7 +412,7 @@ function Assert-SchemaSucceeded {
         }
 
         # Send request
-        Write-Host "Checking whether dataset has finished processing: $OutputSchemaUrl"
+        Write-Verbose "Checking whether dataset has finished processing: $OutputSchemaUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Get" `
             -Uri $OutputSchemaUrl `
@@ -481,7 +481,7 @@ function Publish-Revision {
         $Body = @{ "resource" = @{ "id" = $RevisionId } } | ConvertTo-Json -Compress
 
         # Send request and return response JSON object
-        Write-Host "Publishing revision: $PublishUrl"
+        Write-Verbose "Publishing revision: $PublishUrl"
         $ResponseJson = Invoke-RestMethod `
             -Method "Put" `
             -Uri $PublishUrl `
@@ -519,19 +519,19 @@ function Wait-ForSuccess {
         $ErrorActionPreference = "Stop"
 
         do {
-            Write-Debug "Attempt $Attempts of $MaxAttempts"
+            Write-Verbose "Attempt $Attempts of $MaxAttempts"
             try {
                 $Result = $Action.Invoke()
                 break
             }
             catch [Exception] {
-                Write-Host $_.Exception.Message
+                Write-Verbose $_.Exception.Message
             }
 
             # Retry after $Interval seconds
             $Attempts++
             if ($Attempts -le $MaxAttempts) {
-                Write-Host "Retrying in $Interval seconds..."
+                Write-Verbose "Retrying in $Interval seconds..."
                 Start-Sleep $Interval
             }
             else {
@@ -592,6 +592,10 @@ function New-Dataset {
         $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
 
         # Create revision
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Creating revision..." `
+            -PercentComplete 1
         [PSObject]$Revision = New-Revision `
             -Domain $Domain `
             -Name $Name `
@@ -610,6 +614,10 @@ function New-Dataset {
             -ErrorAction "Stop"
 
         # Create source on revision
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Creating source..." `
+            -PercentComplete 20
         [PSObject]$Source = Add-Source `
             -Domain $Domain `
             -DatasetId $DatasetId `
@@ -619,6 +627,10 @@ function New-Dataset {
         [Int64]$SourceId = $Source.resource.id
 
         # Upload file to source
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Uploading file $Filepath..." `
+            -PercentComplete 40
         if (-not $Filetype) {
             [PSObject]$Upload = Add-Upload `
                 -Domain $Domain `
@@ -649,6 +661,10 @@ function New-Dataset {
         }
 
         # Wait for schema to finish processing
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Processing data..." `
+            -PercentComplete 60
         [Boolean]$SchemaSucceeded = Wait-ForSuccess `
             -Action { Assert-SchemaSucceeded `
                 -Domain $Domain `
@@ -660,6 +676,10 @@ function New-Dataset {
 
         # Publish revision
         if ($Publish -eq $true) {
+            Write-Progress `
+                -Activity $MyInvocation.MyCommand `
+                -Status "Publishing revision..." `
+                -PercentComplete 80
             [PSObject]$PublishedRevision = Publish-Revision `
                 -Domain $Domain `
                 -DatasetId $DatasetId `
@@ -667,7 +687,10 @@ function New-Dataset {
                 -Credentials $Credentials
         }
 
-        Write-Host "View revision: $RevisionUrl"
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Complete: $RevisionUrl" `
+            -PercentComplete 100
         $RevisionUrl
     }
 }
@@ -718,6 +741,10 @@ function Update-Dataset {
         $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
 
         # Create revision
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Creating revision..." `
+            -PercentComplete 1
         [PSObject]$Revision = Open-Revision `
             -Domain $Domain `
             -DatasetId $DatasetId `
@@ -728,6 +755,10 @@ function Update-Dataset {
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
         # Create source on revision
+        Write-Progress `
+        -Activity $MyInvocation.MyCommand `
+        -Status "Creating source..." `
+        -PercentComplete 20
         [PSObject]$Source = Add-Source `
             -Domain $Domain `
             -DatasetId $DatasetId `
@@ -737,6 +768,10 @@ function Update-Dataset {
         [Int64]$SourceId = $Source.resource.id
 
         # Upload file to source
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Uploading file $Filepath..." `
+            -PercentComplete 40
         if (-not $Filetype) {
             [PSObject]$Upload = Add-Upload `
                 -Domain $Domain `
@@ -767,6 +802,10 @@ function Update-Dataset {
         }
 
         # Wait for schema to finish processing
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Processing data..." `
+            -PercentComplete 60
         [Boolean]$SchemaSucceeded = Wait-ForSuccess `
             -Action { Assert-SchemaSucceeded `
                 -Domain $Domain `
@@ -778,6 +817,10 @@ function Update-Dataset {
 
         # Publish revision
         if ($Publish -eq $true) {
+            Write-Progress `
+                -Activity $MyInvocation.MyCommand `
+                -Status "Publishing revision..." `
+                -PercentComplete 80
             [PSObject]$PublishedRevision = Publish-Revision `
                 -Domain $Domain `
                 -DatasetId $DatasetId `
@@ -785,7 +828,10 @@ function Update-Dataset {
                 -Credentials $Credentials
         }
 
-        Write-Host "View revision: $RevisionUrl"
+        Write-Progress `
+            -Activity $MyInvocation.MyCommand `
+            -Status "Complete: $RevisionUrl" `
+            -PercentComplete 100
         $RevisionUrl
     }
 }
