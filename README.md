@@ -29,42 +29,42 @@ Here's a simple PowerShell script that performs a full replace on an existing da
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
-Write-Host "Updating dataset..."
-
-Update-Dataset `
+$RevisionUrl = Update-Dataset `
     -Domain "data.example.gov" `
     -DatasetId "fej7-9vb3" `
     -Type "replace" `
+    -Publish $true `
     -Filepath "\\treasurer\financial_data\budget.csv" `
     -ErrorAction "Stop"
 
-Write-Host "Update complete!"
+Write-Host "Update complete! See dataset revision here: $RevisionUrl"
 ```
 
 ## Authentication
 
 To use this library, you must have access to a Socrata user account with permissions to create and/or update datasets on a Socrata domain.
 
-While the `New-Dataset` and `Update-Dataset` functions will accept a Socrata username and password, it's best to [generate a pair of API keys] and use those instead.
+While Socrata APIs will accept a username and password as HTTP Basic Auth credentials, it's best to [generate a pair of API keys] and use those instead.
 
-By default, this library will automatically look for Socrata credentials under the environment variables `SOCRATA_USERNAME` and `SOCRATA_PASSWORD`. However, you can also supply them explicitly. Note that the password passed in must be a `SecureString`:
+By default, this package will automatically look for Socrata credentials under the environment variables `SOCRATA_USERNAME` and `SOCRATA_PASSWORD`. However, you can also supply them explicitly via a `PSCredential`:
 
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
-$SocrataUsername = $Env:API_KEY_ID
-$SocrataPassword = $Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force
+$Credentials = New-Object PSCredential(
+    $Env:API_KEY_ID,
+    ($Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+)
 
 Update-Dataset `
     -Domain "data.example.gov" `
     -DatasetId "fej7-9vb3" `
     -Type "replace" `
     -Filepath "\\treasurer\financial_data\budget.csv" `
-    -SocrataUsername $SocrataUsername `
-    -SocrataPassword $SocrataPassword
+    -Credentials $Credentials
 ```
 
-Reminder: do not store your secure credentials in a script or commit them to version control.
+As a reminder, do not store secure credentials in a script or commit them to version control.
 
 [generate a pair of API keys]: https://support.socrata.com/hc/en-us/articles/360015776014-API-Keys
 
@@ -75,8 +75,10 @@ Reminder: do not store your secure credentials in a script or commit them to ver
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
 
-$SocrataUsername = $Env:API_KEY_ID
-$SocrataPassword = $Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force
+$Credentials =  New-Object PSCredential(
+    $Env:SOCRATA_KEY_ID,
+    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+)
 
 $Url = Update-Dataset `
     -Domain "data.example.gov" `                   # Required
@@ -85,8 +87,7 @@ $Url = Update-Dataset `
     -Filepath "C:\Documents\vet_facils.geojson" `  # Required
     -Filetype "geojson" `                          # Optional; if not supplied, this is guessed from the filepath
     -Publish $true `                               # Optional; $true or $false (default: $true)
-    -SocrataUsername $SocrataUsername `            # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
-    -SocrataPassword $SocrataPassword              # Optional; if not supplied, this is looked up from the env variable SOCRATA_PASSWORD
+    -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variables SOCRATA_USERNAME and SOCRATA_PASSWORD
 ```
 
 ### Create a new dataset
@@ -96,8 +97,10 @@ Warning: when creating a new dataset programmatically, it's very common to run i
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
 
-$SocrataUsername = $Env:API_KEY_ID
-$SocrataPassword = $Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force
+$Credentials =  New-Object PSCredential(
+    $Env:API_KEY_ID,
+    ($Env:API_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+)
 
 $Url = New-Dataset `
     -Domain "data.example.gov" `                   # Required
@@ -106,8 +109,7 @@ $Url = New-Dataset `
     -Filetype "xlsx" `                             # Optional; if not supplied, this is guessed from the filepath
     -Audience "private" `                          # Optional; "private" or "public" (default: "private")
     -Publish $true `                               # Optional; $true or $false (default: $true)
-    -SocrataUsername $SocrataUsername `            # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
-    -SocrataPassword $SocrataPassword              # Optional; if not supplied, this is looked up from the env variable SOCRATA_PASSWORD
+    -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
 ```
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
@@ -124,7 +126,7 @@ Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
 
 $Url = New-Dataset `
     -Domain "data.example.gov" `                   # Required
-    -Name "Assisted Living Facilities" `           # Required
+    -Name "Assisted Living Facilities by State" `  # Required
     -Filepath "datasets\assisted_living.csv" `     # Required
     -Publish $false `                              # Optional; $true or $false (default: $true)
 ```
@@ -138,7 +140,7 @@ $Url = New-Dataset `
 * [dev.socrata.com]
   + [Libraries and SDKs]
 
+[Dataset Management API: Publishing]: https://socratapublishing.docs.apiary.io
 [Socrata Knowledge Base]: https://support.socrata.com
 [dev.socrata.com]: https://dev.socrata.com
-[Dataset Management API: Publishing]: https://socratapublishing.docs.apiary.io
 [Libraries and SDKs]: https://dev.socrata.com/libraries

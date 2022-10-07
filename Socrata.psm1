@@ -5,6 +5,16 @@
 #Requires -Version 5.1
 
 function Convert-SocrataCredentialsToAuthString {
+    <#
+        .SYNOPSIS
+            Convert Socrata credentials to a Base64-encoded HTTP Basic Auth string.
+
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
+
+        .OUTPUTS
+            String
+    #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([String])]
     Param(
@@ -22,13 +32,10 @@ function Get-SocrataCredentials {
     <#
         .SYNOPSIS
             Obtain Socrata credentials from the local env variables SOCRATA_USERNAME and
-            SOCRATA_PASSWORD.
+            SOCRATA_PASSWORD or, optionally, a PSCredential object passed via parameter.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSCredential
@@ -36,27 +43,26 @@ function Get-SocrataCredentials {
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([PSCredential])]
     Param(
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
-        if (-not $SocrataUsername -or -not $SocrataPassword) {
-            Write-Debug "Credentials not passed or incomplete; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+        if (-not $Credentials) {
+            Write-Debug "Failed to obtain Socrata credentials from parameters; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
             $SocrataUsername = $Env:SOCRATA_USERNAME
-            $SocrataPassword = $Env:SOCRATA_PASSWORD | ConvertTo-SecureString -AsPlainText -Force
+            $SocrataPassword = ConvertTo-SecureString -String $Env:SOCRATA_PASSWORD -AsPlainText -Force
 
             if (-not $SocrataUsername -or -not $SocrataPassword) {
-                throw "Credentials not found or incomplete when looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+                throw "Failed to obtain Socrata credentials from parameters or from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
             }
             else {
-                Write-Debug "Obtained credentials from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+                Write-Warning "Obtained credentials from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
             }
+            New-Object PSCredential($SocrataUsername, $SocrataPassword)
         }
         else {
             Write-Debug "Obtained Socrata credentials"
+            $Credentials
         }
-
-        New-Object PSCredential($SocrataUsername, $SocrataPassword)
     }
 }
 
@@ -71,11 +77,8 @@ function New-Revision {
         .PARAMETER Name
             Name for the new dataset.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSObject
@@ -85,15 +88,11 @@ function New-Revision {
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][String]$Name,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -133,12 +132,6 @@ function Open-Revision {
         .PARAMETER DatasetId
             Unique identifier (4x4) for an existing Socrata dataset.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
-
         .OUTPUTS
             PSObject
     #>
@@ -148,15 +141,11 @@ function Open-Revision {
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][ValidateSet("update", "replace")][String]$Type,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -194,11 +183,8 @@ function Set-Audience {
         .PARAMETER Audience
             Audience for published dataset: "private", "site", or "public".
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSObject
@@ -210,15 +196,11 @@ function Set-Audience {
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][ValidateSet("private", "site", "public")][String] `
             $Audience,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -258,11 +240,8 @@ function Add-Source {
         .PARAMETER RevisionId
             Revision number on which to create the source.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSObject
@@ -273,15 +252,11 @@ function Add-Source {
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][Int64]$RevisionId,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -329,11 +304,8 @@ function Add-Upload {
             Filetype for the data file to upload ("csv", "tsv", "xls", "xlsx", "shapefile", "kml",
             "kmz", or "geojson").
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSObject
@@ -346,15 +318,11 @@ function Add-Upload {
         [Parameter(Mandatory = $true)][String]$Filepath,
         [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson")][String]$Filetype = $null,
         [Parameter(Mandatory = $false)][Int64]$TimeoutSec = 60 * 60 * 24, # Default: 24 hours
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -415,11 +383,8 @@ function Assert-SchemaSucceeded {
         .PARAMETER InputSchemaId
             Unique identifier for an input schema on the source.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             Boolean
@@ -430,15 +395,11 @@ function Assert-SchemaSucceeded {
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][Int64]$SourceId,
         [Parameter(Mandatory = $true)][Int64]$InputSchemaId,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -491,11 +452,8 @@ function Publish-Revision {
         .PARAMETER RevisionId
             Revision number on which to create the source.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSObject
@@ -506,15 +464,11 @@ function Publish-Revision {
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         [Parameter(Mandatory = $true)][Int64]$RevisionId,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
         $AuthString = Convert-SocrataCredentialsToAuthString `
             -Credentials $Credentials `
             -ErrorAction "Stop"
@@ -592,7 +546,7 @@ function Wait-ForSuccess {
 function New-Dataset {
     <#
         .SYNOPSIS
-            Create a new dataset draft on a Socrata domain by uploading a file.
+            Create a new dataset on a Socrata domain by uploading a file.
 
         .PARAMETER Domain
             URL for a Socrata domain.
@@ -613,11 +567,8 @@ function New-Dataset {
         .PARAMETER Publish
             Whether to publish the dataset or leave it as an unpublished revision.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             String
@@ -632,22 +583,17 @@ function New-Dataset {
         [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String] `
             $Audience = "private",
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
 
         # Create revision
         [PSObject]$Revision = New-Revision `
             -Domain $Domain `
             -Name $Name `
-            -SocrataUsername $Credentials.UserName `
-            -SocrataPassword $Credentials.Password `
+            -Credentials $Credentials `
             -ErrorAction "Stop"
         [String]$DatasetId = $Revision.resource.fourfour
         [Int64]$RevisionId = $Revision.resource.revision_seq
@@ -658,8 +604,7 @@ function New-Dataset {
             -Domain $Domain `
             -DatasetId $DatasetId `
             -Audience $Audience `
-            -SocrataUsername $Credentials.UserName `
-            -SocrataPassword $Credentials.Password `
+            -Credentials $Credentials `
             -ErrorAction "Stop"
 
         # Create source on revision
@@ -667,8 +612,7 @@ function New-Dataset {
             -Domain $Domain `
             -DatasetId $DatasetId `
             -RevisionId $RevisionId `
-            -SocrataUsername $Credentials.UserName `
-            -SocrataPassword $Credentials.Password `
+            -Credentials $Credentials `
             -ErrorAction "Stop"
         [Int64]$SourceId = $Source.resource.id
 
@@ -678,8 +622,7 @@ function New-Dataset {
                 -Domain $Domain `
                 -SourceId $SourceId `
                 -Filepath $Filepath `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password `
+                -Credentials $Credentials `
                 -ErrorAction "Stop"
         }
         else {
@@ -688,8 +631,7 @@ function New-Dataset {
                 -SourceId $SourceId `
                 -Filepath $Filepath `
                 -Filetype $Filetype `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password `
+                -Credentials $Credentials `
                 -ErrorAction "Stop"
         }
 
@@ -710,8 +652,7 @@ function New-Dataset {
                 -Domain $Domain `
                 -SourceId $SourceId `
                 -InputSchemaId $LatestInputSchemaId `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password `
+                -Credentials $Credentials `
                 -ErrorAction "Stop" } `
             -ErrorAction "Stop"
 
@@ -721,8 +662,7 @@ function New-Dataset {
                 -Domain $Domain `
                 -DatasetId $DatasetId `
                 -RevisionId $RevisionId `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password
+                -Credentials $Credentials
         }
 
         Write-Host "View revision: $RevisionUrl"
@@ -754,11 +694,8 @@ function Update-Dataset {
         .PARAMETER Publish
             Whether to publish the dataset or leave it as an unpublished revision.
 
-        .PARAMETER SocrataUsername
-            Socrata username or API key identifier.
-
-        .PARAMETER SocrataPassword
-            Socrata password or API key secret.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             String
@@ -772,23 +709,18 @@ function Update-Dataset {
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson")][String]$Filetype = $null,
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
-        [Parameter(Mandatory = $false)][String]$SocrataUsername = $null,
-        [Parameter(Mandatory = $false)][SecureString]$SocrataPassword = $null
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
         # Get credentials
-        $Credentials = Get-SocrataCredentials `
-            -SocrataUsername $SocrataUsername `
-            -SocrataPassword $SocrataPassword `
-            -ErrorAction "Stop"
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
 
         # Create revision
         [PSObject]$Revision = Open-Revision `
             -Domain $Domain `
             -DatasetId $DatasetId `
             -Type $Type `
-            -SocrataUsername $Credentials.UserName `
-            -SocrataPassword $Credentials.Password `
+            -Credentials $Credentials `
             -ErrorAction "Stop"
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
@@ -798,8 +730,7 @@ function Update-Dataset {
             -Domain $Domain `
             -DatasetId $DatasetId `
             -RevisionId $RevisionId `
-            -SocrataUsername $Credentials.UserName `
-            -SocrataPassword $Credentials.Password `
+            -Credentials $Credentials `
             -ErrorAction "Stop"
         [Int64]$SourceId = $Source.resource.id
 
@@ -809,8 +740,7 @@ function Update-Dataset {
                 -Domain $Domain `
                 -SourceId $SourceId `
                 -Filepath $Filepath `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password `
+                -Credentials $Credentials `
                 -ErrorAction "Stop"
         }
         else {
@@ -819,8 +749,7 @@ function Update-Dataset {
                 -SourceId $SourceId `
                 -Filepath $Filepath `
                 -Filetype $Filetype `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password `
+                -Credentials $Credentials `
                 -ErrorAction "Stop"
         }
 
@@ -841,8 +770,7 @@ function Update-Dataset {
                 -Domain $Domain `
                 -SourceId $SourceId `
                 -InputSchemaId $LatestInputSchemaId `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password `
+                -Credentials $Credentials `
                 -ErrorAction "Stop" } `
             -ErrorAction "Stop"
 
@@ -852,8 +780,7 @@ function Update-Dataset {
                 -Domain $Domain `
                 -DatasetId $DatasetId `
                 -RevisionId $RevisionId `
-                -SocrataUsername $Credentials.UserName `
-                -SocrataPassword $Credentials.Password
+                -Credentials $Credentials
         }
 
         Write-Host "View revision: $RevisionUrl"
