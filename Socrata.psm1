@@ -22,7 +22,7 @@ function Convert-SocrataCredentialsToAuthString {
     )
     Process {
         [String]$Base64EncodedAuth = [System.Convert]::ToBase64String(
-            [System.Text.Encoding]::UTF8.GetBytes("$($Credentials.UserName):$($Credentials.Password | ConvertFrom-SecureString -AsPlainText)")
+            [System.Text.Encoding]::UTF8.GetBytes("$($Credentials.UserName):$($Credentials.GetNetworkCredential().Password)")
         )
         $Base64EncodedAuth
     }
