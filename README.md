@@ -133,14 +133,26 @@ $Url = New-Dataset `
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
 
-## Other resources
+## Tests
 
-* [Dataset Management API: Publishing]
-* [Socrata Knowledge Base]
-* [dev.socrata.com]
-  + [Libraries and SDKs]
+To run Socrata-PowerShell's integration tests, run [Pester] at the repository root:
 
-[Dataset Management API: Publishing]: https://socratapublishing.docs.apiary.io
-[Socrata Knowledge Base]: https://support.socrata.com
-[dev.socrata.com]: https://dev.socrata.com
-[Libraries and SDKs]: https://dev.socrata.com/libraries
+```powershell
+Invoke-Pester -Output Detailed
+```
+
+For the tests to pass, the following environment variables must be set:
+
+* `SOCRATA_POWERSHELL_TEST_DOMAIN`
+* `SOCRATA_POWERSHELL_TEST_DATASET_ID`
+* `SOCRATA_USERNAME`
+* `SOCRATA_PASSWORD`
+
+To run script analysis, use [PSScriptAnalyzer]:
+
+```powershell
+Invoke-ScriptAnalyzer -Path ./Socrata.psm1
+```
+
+[Pester]: https://pester.dev
+[PSScriptAnalyzer]: https://learn.microsoft.com/en-us/powershell/module/psscriptanalyzer/?view=ps-modules
