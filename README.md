@@ -5,6 +5,17 @@ A PowerShell module for creating and updating datasets on a Socrata domain via t
 
 [Dataset Management API]: https://dev.socrata.com/publishers/dsmapi.html
 
+## Contents
+
+* [Installation](#installation)
+* [Quickstart](#quickstart)
+* [Authentication](#authentication)
+* [Examples](#examples)
+  + [Update an existing dataset](#update-an-existing-dataset)
+  + [Create a new dataset](#create-a-new-dataset)
+  + [Create a dataset draft](#create-a-dataset-draft)
+* [Tests](#tests)
+
 ## Installation
 
 To install this module:
@@ -92,7 +103,10 @@ $Url = Update-Dataset `
 
 ### Create a new dataset
 
-Warning: when creating a new dataset programmatically, it's very common to run into data quality errors and schema issues. As a result, it's usually better to create a new dataset using the [Data Management Experience] user interface, implement any desired schema changes, metadata additions, etc., and then publish. You can then schedule programmatic [updates] for the dataset going forward.
+Note: it's not unusual to run into schema errors and data quality issues when creating a dataset programmatically. A good workaround is to create a new dataset using the [Data Management Experience] user interface, add any desired fixes or schema changes, then publish. After that, you can schedule programmatic [updates] for the dataset going forward.
+
+[Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
+[updates]: #update-an-existing-dataset
 
 ```powershell
 Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
@@ -109,13 +123,10 @@ $Url = New-Dataset `
     -Filetype "xlsx" `                             # Optional; if not supplied, this is guessed from the filepath
     -Audience "private" `                          # Optional; "private" or "public" (default: "private")
     -Publish $true `                               # Optional; $true or $false (default: $true)
-    -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variable SOCRATA_USERNAME
+    -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variables SOCRATA_USERNAME and SOCRATA_PASSWORD
 ```
 
-[Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
-[updates]: #update-an-existing-dataset
-
-### Create a dataset draft without publishing it
+### Create a dataset draft
 
 It is often desired to create a draft revision of a new or existing dataset without publishing the draft. For example, you may want to manually inspect a dataset in the [Data Management Experience] user interface before publishing.
 
@@ -138,7 +149,7 @@ $Url = New-Dataset `
 To run Socrata-PowerShell's integration tests, run [Pester] at the repository root:
 
 ```powershell
-Invoke-Pester -Output Detailed
+Invoke-Pester -Output "Detailed"
 ```
 
 For the tests to pass, the following environment variables must be set:
@@ -151,7 +162,7 @@ For the tests to pass, the following environment variables must be set:
 To run script analysis, use [PSScriptAnalyzer]:
 
 ```powershell
-Invoke-ScriptAnalyzer -Path ./Socrata.psm1
+Invoke-ScriptAnalyzer -Path "./Socrata.psm1"
 ```
 
 [Pester]: https://pester.dev
