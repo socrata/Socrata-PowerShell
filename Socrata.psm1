@@ -4,273 +4,120 @@
 
 #Requires -Version 5.1
 
-function Convert-SocrataCredentialsToAuthString {
-    <#
-        .SYNOPSIS
-            Convert Socrata credentials to a Base64-encoded HTTP Basic Auth string.
+class SocrataClient {
+    [String][ValidatePattern("^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$")]$Domain
+    [PSCredential] hidden $Auth
 
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
+    SocrataClient ([String]$Domain) {
+        $this.Domain = $Domain
+        $this.Auth = $this.GetAuthFromEnvironment()
+    }
 
-        .OUTPUTS
-            String
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([String])]
-    Param(
-        [Parameter(Mandatory = $true)][PSCredential]$Credentials
-    )
-    Process {
+    SocrataClient ([String]$Domain, [PSCredential]$Auth) {
+        $this.Domain = $Domain
+        $this.Auth = if (-not $Auth) { $this.GetAuthFromEnvironment() } else { $Auth }
+    }
+
+    [String]GetAuthFromEnvironment() {
+        Write-Debug "Failed to obtain Socrata credentials from parameter; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+        $SocrataUsername = $Env:SOCRATA_USERNAME
+        $SocrataPassword = ConvertTo-SecureString -String $Env:SOCRATA_PASSWORD -AsPlainText -Force
+
+        if (-not $SocrataUsername -or -not $SocrataPassword) {
+            throw "Failed to obtain Socrata credentials from parameters or from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+        } else {
+            Write-Warning "Obtained credentials from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+        }
+        return New-Object PSCredential($SocrataUsername, $SocrataPassword)
+    }
+
+    [String]GetAuthString() {
         [String]$Base64EncodedAuth = [System.Convert]::ToBase64String(
-            [System.Text.Encoding]::UTF8.GetBytes("$($Credentials.UserName):$($Credentials.GetNetworkCredential().Password)")
+            [System.Text.Encoding]::UTF8.GetBytes("$($this.Auth.UserName):$($this.Auth.GetNetworkCredential().Password)")
         )
-        $Base64EncodedAuth
+        return $Base64EncodedAuth
     }
-}
 
-function Get-SocrataCredentials {
-    <#
-        .SYNOPSIS
-            Obtain Socrata credentials from the local env variables SOCRATA_USERNAME and
-            SOCRATA_PASSWORD or, optionally, a PSCredential object passed via parameter.
+    [PSCustomObject]SendRequest([String]$Method, [String]$Route, [Hashtable]$Body) {
+        $Url = "https://$($this.Domain)$Route"
+        $AuthString = $this.GetAuthString()
+        $Headers = @{ "Authorization" = "Basic $($this.GetAuthString())" }
+        $RequestBody = if ($Body) { ConvertTo-Json -InputObject $Body -Compress } else { $null }
 
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSCredential
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSCredential])]
-    Param(
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        if (-not $Credentials) {
-            Write-Debug "Failed to obtain Socrata credentials from parameter; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
-            $SocrataUsername = $Env:SOCRATA_USERNAME
-            $SocrataPassword = ConvertTo-SecureString -String $Env:SOCRATA_PASSWORD -AsPlainText -Force
-
-            if (-not $SocrataUsername -or -not $SocrataPassword) {
-                throw "Failed to obtain Socrata credentials from parameters or from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
-            }
-            else {
-                Write-Warning "Obtained credentials from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
-            }
-            New-Object PSCredential($SocrataUsername, $SocrataPassword)
-        }
-        else {
-            Write-Verbose "Obtained Socrata credentials"
-            $Credentials
-        }
+        Write-Debug "Sending $Method request to URL: $Url"
+        [PSCustomObject]$ResponseJson = Invoke-RestMethod `
+            -Method $Method `
+            -Uri $Url `
+            -Headers $Headers `
+            -ContentType "application/json" `
+            -Body $RequestBody
+        return $ResponseJson
     }
-}
 
-function New-Revision {
-    <#
-        .SYNOPSIS
-            Create the initial revision of an entirely new dataset.
+    [PSCustomObject]SendRequest([String]$Method, [String]$Route) {
+        return $this.SendRequest($Method, $Route, $null)
+    }
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
+    [PSCustomObject]SendFile(
+        [String]$Route,
+        [String]$ContentType,
+        [String]$Filepath,
+        [Int64]$TimeoutSec
+    ) {
+        $Url = "https://$($this.Domain)$Route"
+        $AuthString = $this.GetAuthString()
+        $Headers = @{ "Authorization" = "Basic $($this.GetAuthString())" }
 
-        .PARAMETER Name
-            Name for the new dataset.
+        Write-Debug "Sending file to URL: $Url"
+        [PSCustomObject]$ResponseJson = Invoke-RestMethod `
+            -Method "Post" `
+            -Uri $Url `
+            -Headers $Headers `
+            -ContentType $ContentType `
+            -InFile $Filepath `
+            -TimeoutSec $TimeoutSec
+        return $ResponseJson
+    }
 
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSObject
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][String]$Name,
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to create a revision
-        $RevisionUrl = "https://$Domain/api/publishing/v1/revision"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
+    [PSCustomObject]NewRevision([String]$Name) {
+        $Route = "/api/publishing/v1/revision"
         $Body = @{
             "metadata" = @{
                 "name" = $Name
             }
-        } | ConvertTo-Json -Compress
+        }
 
-        # Send request and return response JSON object
-        Write-Verbose "Creating new revision: $RevisionUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Post" `
-            -Uri $RevisionUrl `
-            -Headers $Headers `
-            -ContentType "application/json" `
-            -Body $Body
-        $ResponseJson
+        Write-Verbose "Creating new revision: $Route"
+        $ResponseJson = $this.SendRequest("Post", $Route, $Body)
+        return $ResponseJson
     }
-}
 
-function Open-Revision {
-    <#
-        .SYNOPSIS
-            Open a new revision to an existing Socrata dataset and return the response JSON.
-
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for an existing Socrata dataset.
-
-        .PARAMETER Type
-            Revision type ("update", "replace", or "delete").
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSObject
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
-        [Parameter(Mandatory = $true)][ValidateSet("update", "replace", "delete")][String]$Type,
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to create a revision
-        $RevisionUrl = "https://$Domain/api/publishing/v1/revision/$DatasetId"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
+    [PSCustomObject]OpenRevision([String]$DatasetId, [String]$Type) {
+        $Route = "/api/publishing/v1/revision/$DatasetId"
         $Body = @{
             "action" = @{ "type" = $Type }
-        } | ConvertTo-Json -Compress
+        }
 
-        # Send request and return response JSON object
-        Write-Verbose "Creating new revision: $RevisionUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Post" `
-            -Uri $RevisionUrl `
-            -Headers $Headers `
-            -ContentType "application/json" `
-            -Body $Body
-        $ResponseJson
+        Write-Verbose "Opening revision: $Route"
+        $ResponseJson = $this.SendRequest("Post", $Route, $Body)
+        return $ResponseJson
     }
-}
 
-function Set-Audience {
-    <#
-        .SYNOPSIS
-            Set the publication audience for a revision.
-
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for a Socrata dataset.
-
-        .PARAMETER RevisionId
-            Revision number on which to set the audience.
-
-        .PARAMETER Audience
-            Audience for published dataset: "private", "site", or "public".
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSObject
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
-        [Parameter(Mandatory = $true)][Int64]$RevisionId,
-        [Parameter(Mandatory = $true)][ValidateSet("private", "site", "public")][String] `
-            $Audience,
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to set the audience on a revision
-        $AudienceUrl = "https://$Domain/api/publishing/v1/revision/$DatasetId/$RevisionId"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
+    [PSCustomObject]SetAudience([String]$DatasetId, [Int64]$RevisionId, [String]$Audience) {
+        $Route = "/api/publishing/v1/revision/$DatasetId/$RevisionId"
         $Body = @{
             "permissions" = @{
                 "scope" = $Audience
             }
-        } | ConvertTo-Json -Compress
+        }
 
-        # Send request and return response JSON object
-        Write-Verbose "Setting audience: $AudienceUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Put" `
-            -Uri $AudienceUrl `
-            -Headers $Headers `
-            -ContentType "application/json" `
-            -Body $Body
-        $ResponseJson
+        Write-Verbose "Setting audience: $Route"
+        $ResponseJson = $this.SendRequest("Put", $Route, $Body)
+        return $ResponseJson
     }
-}
 
-function Add-Source {
-    <#
-        .SYNOPSIS
-            Create a new source on a revision and return the response JSON.
-
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for a Socrata dataset.
-
-        .PARAMETER RevisionId
-            Revision number on which to create the source.
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSObject
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
-        [Parameter(Mandatory = $true)][Int64]$RevisionId,
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to create a source on a revision
-        $SourceUrl = "https://$Domain/api/publishing/v1/revision/$DatasetId/$RevisionId/source"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
+    [PSCustomObject]AddSource([String]$DatasetId, [Int64]$RevisionId) {
+        $Route = "/api/publishing/v1/revision/$DatasetId/$RevisionId/source"
         $Body = @{
             "source_type"   = @{
                 "type"     = "upload"
@@ -279,62 +126,15 @@ function Add-Source {
             "parse_options" = @{
                 "parse_source" = "true"
             }
-        } | ConvertTo-Json -Compress
+        }
 
-        # Send request and return response JSON object
-        Write-Verbose "Creating new source: $SourceUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Post" `
-            -Uri $SourceUrl `
-            -Headers $Headers `
-            -ContentType "application/json" `
-            -Body $Body
-        $ResponseJson
+        Write-Verbose "Creating new source: $Route"
+        $ResponseJson = $this.SendRequest("Post", $Route, $Body)
+        return $ResponseJson
     }
-}
 
-function Add-Upload {
-    <#
-        .SYNOPSIS
-            Upload a file to a source and return the response JSON.
-
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER SourceId
-            Unique identifier for a source.
-
-        .PARAMETER Filepath
-            Path representing the data file to upload.
-
-        .PARAMETER Filetype
-            Filetype for the data file to upload ("csv", "tsv", "xls", "xlsx", "shapefile", "kml",
-            "kmz", or "geojson").
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSObject
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][Int64]$SourceId,
-        [Parameter(Mandatory = $true)][String]$Filepath,
-        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson")][String]$Filetype = $null,
-        [Parameter(Mandatory = $false)][Int64]$TimeoutSec = 60 * 60 * 24, # Default: 24 hours
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Determine request Content-Type
+    [PSCustomObject]AddUpload([String]$SourceId, [String]$Filepath, [String]$Filetype) {
+        $Route = "/api/publishing/v1/source/$SourceId"
         $ContentTypeMappings = @{
             "csv"       = "text/csv"
             "tsv"       = "text/tab-separated-values"
@@ -352,78 +152,22 @@ function Add-Upload {
             $FileExtension = [System.IO.Path]::GetExtension($Filepath).ToLower().Substring(1)
             $ContentType = $ContentTypeMappings.$FileExtension
             Write-Warning "Inferred content type '$ContentType' from extension '$FileExtension'"
-        }
-        else {
+        } else {
             $ContentType = $ContentTypeMappings.$Filetype
         }
-
-        # Prepare HTTP request to upload file to a revision source
-        $SourceUploadUrl = "https://$Domain/api/publishing/v1/source/$SourceId"
-        $Headers = @{
-            "Authorization" = "Basic $AuthString"
-        }
+        $TimeoutSec = 60 * 60 * 24
 
         # Send request and return response JSON object
-        Write-Verbose "Uploading file to source: $SourceUploadUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Post" `
-            -Uri $SourceUploadUrl `
-            -Headers $Headers `
-            -ContentType $ContentType `
-            -InFile $Filepath `
-            -TimeoutSec $TimeoutSec
-        $ResponseJson
+        Write-Verbose "Uploading file to source: $Route"
+        $ResponseJson = $this.SendFile($Route, $ContentType, $Filepath, $TimeoutSec)
+        return $ResponseJson
     }
-}
 
-function Assert-SchemaSucceeded {
-    <#
-        .SYNOPSIS
-            Assert that an output schema has succeeded in processing. If not, throw an error.
+    [Boolean]AssertSchemaSucceeded([Int64]$SourceId, [Int64]$InputSchemaId) {
+        $Route = "/api/publishing/v1/source/$SourceId/schema/$InputSchemaId/output/latest"
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER SourceId
-            Unique identifier for a source.
-
-        .PARAMETER InputSchemaId
-            Unique identifier for an input schema on the source.
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            Boolean
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([Boolean])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][Int64]$SourceId,
-        [Parameter(Mandatory = $true)][Int64]$InputSchemaId,
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to upload file to a revision source
-        $OutputSchemaUrl = "https://$Domain/api/publishing/v1/source/$SourceId/schema/$InputSchemaId/output/latest"
-        $Headers = @{
-            "Authorization" = "Basic $AuthString"
-            "Accept" = "application/json"
-        }
-
-        # Send request
-        Write-Verbose "Checking whether dataset has finished processing: $OutputSchemaUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Get" `
-            -Uri $OutputSchemaUrl `
-            -Headers $Headers
+        Write-Verbose "Checking whether dataset has finished processing: $Route"
+        $ResponseJson = $this.SendRequest("Get", $Route)
 
         # Determine whether schema finished processing
         $SchemaFinishedProcessing = -not [String]::IsNullOrEmpty($ResponseJson.resource.finished_at)
@@ -443,60 +187,18 @@ function Assert-SchemaSucceeded {
         if (-not $SchemaSucceeded) {
             throw "Dataset has not yet finished processing"
         }
-        $SchemaSucceeded
+        return $SchemaSucceeded
     }
-}
 
-function Publish-Revision {
-    <#
-        .SYNOPSIS
-            Upload a file to a source and return the response JSON.
+    [PSObject]PublishRevision([String]$DatasetId, [Int64]$RevisionId) {
+        $Route = "/api/publishing/v1/revision/$DatasetId/$RevisionId/apply"
+        $Body = @{ "resource" = @{ "id" = $RevisionId } }
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for a Socrata dataset.
-
-        .PARAMETER RevisionId
-            Revision number on which to create the source.
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
-        .OUTPUTS
-            PSObject
-    #>
-    [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
-    Param(
-        [Parameter(Mandatory = $true)][String]$Domain,
-        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
-        [Parameter(Mandatory = $true)][Int64]$RevisionId,
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
-    )
-    Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to publish revision
-        $PublishUrl = "https://$Domain/api/publishing/v1/revision/$DatasetId/$RevisionId/apply"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
-        $Body = @{ "resource" = @{ "id" = $RevisionId } } | ConvertTo-Json -Compress
-
-        # Send request and return response JSON object
-        Write-Verbose "Publishing revision: $PublishUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Put" `
-            -Uri $PublishUrl `
-            -Headers $Headers `
-            -ContentType "application/json" `
-            -Body $Body
-        $ResponseJson
+        Write-Verbose "Publishing revision: $Route"
+        $ResponseJson = $this.SendRequest("Put", $Route, $Body)
+        return $ResponseJson
     }
+
 }
 
 function Wait-ForSuccess {
@@ -595,67 +297,30 @@ function New-Dataset {
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
+        # Initialize client
+        $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
 
         # Create revision
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Creating revision..." `
-            -PercentComplete 1
-        [PSObject]$Revision = New-Revision `
-            -Domain $Domain `
-            -Name $Name `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
+        $Status = "Creating revision..."
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 1
+        [PSObject]$Revision = $Client.NewRevision($Name)
         [String]$DatasetId = $Revision.resource.fourfour
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
         # Set audience on revision
-        [PSObject]$Revision = Set-Audience `
-            -Domain $Domain `
-            -DatasetId $DatasetId `
-            -Revisionid $RevisionId `
-            -Audience $Audience `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
+        [PSObject]$Revision = $Client.SetAudience($DatasetId, $RevisionId, $Audience)
 
         # Create source on revision
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Creating source..." `
-            -PercentComplete 20
-        [PSObject]$Source = Add-Source `
-            -Domain $Domain `
-            -DatasetId $DatasetId `
-            -RevisionId $RevisionId `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
+        $Status = "Creating source..."
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 20
+        [PSObject]$Source = $Client.AddSource($DatasetId, $RevisionId)
         [Int64]$SourceId = $Source.resource.id
 
         # Upload file to source
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Uploading file $Filepath..." `
-            -PercentComplete 40
-        if (-not $Filetype) {
-            [PSObject]$Upload = Add-Upload `
-                -Domain $Domain `
-                -SourceId $SourceId `
-                -Filepath $Filepath `
-                -Credentials $Credentials `
-                -ErrorAction "Stop"
-        }
-        else {
-            [PSObject]$Upload = Add-Upload `
-                -Domain $Domain `
-                -SourceId $SourceId `
-                -Filepath $Filepath `
-                -Filetype $Filetype `
-                -Credentials $Credentials `
-                -ErrorAction "Stop"
-        }
+        $Status = "Uploading file $Filepath..."
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 40
+        [PSObject]$Upload = $Client.AddUpload($SourceId, $Filepath, $Filetype)
 
         # Get latest input schema based on highest ID
         try {
@@ -669,36 +334,22 @@ function New-Dataset {
         }
 
         # Wait for schema to finish processing
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Processing data..." `
-            -PercentComplete 60
+        $Status = "Processing data..."
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 60
         [Boolean]$SchemaSucceeded = Wait-ForSuccess `
-            -Action { Assert-SchemaSucceeded `
-                -Domain $Domain `
-                -SourceId $SourceId `
-                -InputSchemaId $LatestInputSchemaId `
-                -Credentials $Credentials `
-                -ErrorAction "Stop" } `
+            -Action { $Client.AssertSchemaSucceeded($SourceId, $LatestInputSchemaId) } `
             -ErrorAction "Stop"
 
         # Publish revision
         if ($Publish -eq $true) {
-            Write-Progress `
-                -Activity $MyInvocation.MyCommand `
-                -Status "Publishing revision..." `
-                -PercentComplete 80
-            [PSObject]$PublishedRevision = Publish-Revision `
-                -Domain $Domain `
-                -DatasetId $DatasetId `
-                -RevisionId $RevisionId `
-                -Credentials $Credentials
+            $Status = "Publishing revision..."
+            Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 80
+            [PSObject]$PublishedRevision = $Client.PublishRevision($DatasetId, $RevisionId)
         }
 
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Complete: $RevisionUrl" `
-            -PercentComplete 100
+        # Return revision URL
+        $Status = "Complete: $RevisionUrl"
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 100
         $RevisionUrl
     }
 }
