@@ -180,6 +180,9 @@ function Set-Audience {
         .PARAMETER DatasetId
             Unique identifier (4x4) for a Socrata dataset.
 
+        .PARAMETER RevisionId
+            Revision number on which to set the audience.
+
         .PARAMETER Audience
             Audience for published dataset: "private", "site", or "public".
 
@@ -194,6 +197,7 @@ function Set-Audience {
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        [Parameter(Mandatory = $true)][Int64]$RevisionId,
         [Parameter(Mandatory = $true)][ValidateSet("private", "site", "public")][String] `
             $Audience,
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
@@ -609,6 +613,7 @@ function New-Dataset {
         [PSObject]$Revision = Set-Audience `
             -Domain $Domain `
             -DatasetId $DatasetId `
+            -Revisionid $RevisionId `
             -Audience $Audience `
             -Credentials $Credentials `
             -ErrorAction "Stop"

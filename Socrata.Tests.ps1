@@ -67,7 +67,7 @@ Describe "New-Dataset" {
             -Domain $TestDomain `
             -Name "Testing Socrata-PowerShell" `
             -Filepath $CsvFilepath `
-            -Audience "private" `
+            -Audience "site" `
             -Publish $true `
             -Credentials $Credentials
 
@@ -80,6 +80,7 @@ Describe "New-Dataset" {
 
         # Check that the update was successful
         $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
+        $RevisionJson.resource.permissions.scope | Should -BeExactly "site"
 
         # Delete newly created dataset
         Remove-Dataset -DatasetId $NewDatasetId
