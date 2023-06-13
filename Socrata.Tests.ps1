@@ -72,7 +72,7 @@ Describe "New-Dataset" {
             -Credentials $Credentials
 
         # Wait for the revision to finish applying, then check that it completed successfully
-        Start-Sleep -Seconds 20
+        Start-Sleep -Seconds 30
         $RevisionUrl | Should -Match $RevisionUrlPattern
         $RevisionUrl -Match $RevisionUrlPattern
         $NewDatasetId = $Matches.dataset_id
@@ -90,6 +90,50 @@ Describe "New-Dataset" {
 
 Describe "Update-Dataset" {
     It "Given a Socrata domain, dataset ID, and CSV file, updates an existing dataset" {
+        $RevisionType = "update"
+
+        # Execute function
+        $RevisionUrl = Update-Dataset `
+            -Domain $TestDomain `
+            -DatasetId $TestDatasetId `
+            -Filepath $CsvFilepath `
+            -Type $RevisionType `
+            -Publish $true `
+            -Credentials $Credentials
+
+        # Wait for the revision to finish applying, then check that it completed successfully
+        Start-Sleep -Seconds 30
+        $RevisionUrl | Should -Match $RevisionUrlPattern
+        $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $TestDatasetId
+
+        # Check that the revision was successful
+        $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
+        $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
+    }
+
+    It "Given a Socrata domain, dataset ID, and CSV file, deletes rows in an existing dataset" {
+        $RevisionType = "delete"
+
+        # Execute function
+        $RevisionUrl = Update-Dataset `
+            -Domain $TestDomain `
+            -DatasetId $TestDatasetId `
+            -Filepath $CsvFilepath `
+            -Type $RevisionType `
+            -Publish $true `
+            -Credentials $Credentials
+
+        # Wait for the revision to finish applying, then check that it completed successfully
+        Start-Sleep -Seconds 30
+        $RevisionUrl | Should -Match $RevisionUrlPattern
+        $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $TestDatasetId
+
+        # Check that the revision was successful
+        $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
+        $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
+    }
+
+    It "Given a Socrata domain, dataset ID, and CSV file, replaces an existing dataset" {
         $RevisionType = "replace"
 
         # Execute function
@@ -102,11 +146,11 @@ Describe "Update-Dataset" {
             -Credentials $Credentials
 
         # Wait for the revision to finish applying, then check that it completed successfully
-        Start-Sleep -Seconds 20
+        Start-Sleep -Seconds 30
         $RevisionUrl | Should -Match $RevisionUrlPattern
         $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $TestDatasetId
 
-        # Check that the update was successful
+        # Check that the revision was successful
         $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
         $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
     }
