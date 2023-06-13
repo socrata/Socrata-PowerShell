@@ -127,7 +127,7 @@ function Open-Revision {
             URL for a Socrata domain.
 
         .PARAMETER Type
-            Revision type ("update" or "replace").
+            Revision type ("update", "replace", or "delete").
 
         .PARAMETER DatasetId
             Unique identifier (4x4) for an existing Socrata dataset.
@@ -140,7 +140,7 @@ function Open-Revision {
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
-        [Parameter(Mandatory = $true)][ValidateSet("update", "replace")][String]$Type,
+        [Parameter(Mandatory = $true)][ValidateSet("update", "replace", "delete")][String]$Type,
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
@@ -712,7 +712,7 @@ function Update-Dataset {
             Unique identifier (4x4) for a Socrata dataset.
 
         .PARAMETER Type
-            Revision type ("update" or "replace").
+            Revision type ("update", "replace", or "delete").
 
         .PARAMETER Filepath
             Path representing the data file to upload.
@@ -735,7 +735,7 @@ function Update-Dataset {
     Param(
         [Parameter(Mandatory = $true)][String]$Domain,
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
-        [Parameter(Mandatory = $true)][ValidateSet("update", "replace")][String]$Type,
+        [Parameter(Mandatory = $true)][ValidateSet("update", "replace", "delete")][String]$Type,
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson")][String]$Filetype = $null,
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,

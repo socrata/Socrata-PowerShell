@@ -94,7 +94,7 @@ $Credentials = New-Object PSCredential(
 $Url = Update-Dataset `
     -Domain "data.example.gov" `                   # Required
     -DatasetId "c2xb-y8f6" `                       # Required
-    -Type "update" `                               # Required; "update" (upsert/append) or "replace" (full replace)
+    -Type "update" `                               # Required; "update" (upsert/append), "replace" (full replace), or "delete" (delete rows)
     -Filepath "C:\Documents\vet_facils.geojson" `  # Required
     -Filetype "geojson" `                          # Optional; if not supplied, this is guessed from the filepath
     -Publish $true `                               # Optional; $true or $false (default: $true)
