@@ -843,3 +843,106 @@ function Update-Dataset {
         $RevisionUrl
     }
 }
+
+function Get-Metadata {
+    <#
+        .SYNOPSIS
+            Get the metadata for a Socrata asset and return the response JSON.
+
+        .PARAMETER Domain
+            URL for a Socrata domain.
+
+        .PARAMETER DatasetId
+            Unique identifier (4x4) for an existing Socrata dataset.
+
+        .OUTPUTS
+            PSObject
+    #>
+    [CmdletBinding(PositionalBinding = $false)]
+    [OutputType([PSObject])]
+    Param(
+        [Parameter(Mandatory = $true)][String]$Domain,
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
+    )
+    Process {
+        # Get credentials
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
+        $AuthString = Convert-SocrataCredentialsToAuthString `
+            -Credentials $Credentials `
+            -ErrorAction "Stop"
+
+        # Prepare HTTP request to get metadata
+        $MetadataUrl = "https://$Domain/api/views/metadata/v1/$DatasetId"
+        $Headers = @{ "Authorization" = "Basic $AuthString" }
+
+        # Send request and return response JSON object
+        Write-Verbose "Getting metadata: $MetadataUrl"
+        $ResponseJson = Invoke-RestMethod `
+            -Method "Get" `
+            -Uri $MetadataUrl `
+            -Headers $Headers `
+            -ContentType "application/json"
+        $ResponseJson
+    }
+}
+
+function Update-Metadata {
+    <#
+        .SYNOPSIS
+            Update the metadata for a Socrata asset and return the response JSON.
+
+        .PARAMETER Domain
+            URL for a Socrata domain.
+
+        .PARAMETER DatasetId
+            Unique identifier (4x4) for an existing Socrata dataset.
+
+        .PARAMETER Fields
+            Object containing metadata fields to use in updating the asset.
+
+        .PARAMETER ValidateOnly
+            Whether to simply perform validation on the input fields without modifying the asset.
+            The asset's metadata is then returned as it would be if it had been modified, along
+            with a list of errors and warnings.
+
+        .PARAMETER Strict
+            Whether to perform strict validation on the input fields.
+
+        .OUTPUTS
+            PSObject
+    #>
+    [CmdletBinding(PositionalBinding = $false)]
+    [OutputType([PSObject])]
+    Param(
+        [Parameter(Mandatory = $true)][String]$Domain,
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        [Parameter(Mandatory = $true)][PSObject]$Fields,
+        [Parameter(Mandatory = $false)][Boolean]$ValidateOnly = $false,
+        [Parameter(Mandatory = $false)][Boolean]$Strict = $false,
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
+    )
+    Process {
+        # Get credentials
+        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
+        $AuthString = Convert-SocrataCredentialsToAuthString `
+            -Credentials $Credentials `
+            -ErrorAction "Stop"
+
+        # Prepare HTTP request to update metadata
+        $BaseMetadataUrl = "https://$Domain/api/views/metadata/v1/$DatasetId"
+        $QueryString = "validateOnly=$ValidateOnly&strict=$Strict".
+        $MetadataUrl = "$BaseMetadataUrl?$QueryString"
+        $Headers = @{ "Authorization" = "Basic $AuthString" }
+
+        # Send request and return response JSON object
+        Write-Verbose "Updating metadata: $MetadataUrl"
+        $ResponseJson = Invoke-RestMethod `
+            -Method "Patch" `
+            -Uri $MetadataUrl `
+            -Headers $Headers `
+            -ContentType "application/json" `
+            -Body $Fields
+        $ResponseJson
+    }
+}
