@@ -1,9 +1,7 @@
 Socrata-PowerShell
 ==================
 
-A PowerShell module for creating and updating datasets on a Socrata domain via the [Dataset Management API].
-
-[Dataset Management API]: https://dev.socrata.com/publishers/dsmapi.html
+A PowerShell module for creating and updating datasets on a Socrata domain.
 
 ## Contents
 
@@ -14,6 +12,8 @@ A PowerShell module for creating and updating datasets on a Socrata domain via t
   + [Update an existing dataset](#update-an-existing-dataset)
   + [Create a new dataset](#create-a-new-dataset)
   + [Create a dataset draft](#create-a-dataset-draft)
+  + [Get dataset metadata](#get-dataset-metadata)
+  + [Update dataset metadata](#update-dataset-metadata)
 * [Tests](#tests)
 
 ## Installation
@@ -143,6 +143,69 @@ $Url = New-Dataset `
 ```
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
+
+### Get dataset metadata
+
+```powershell
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Get-Metadata"
+
+$Credentials = New-Object PSCredential(
+    $Env:SOCRATA_KEY_ID,
+    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+)
+
+$Fields = Get-Metadata `
+    -Domain "data.example.gov" `                   # Required
+    -DatasetId "prx6-94ku" `                       # Required
+    -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variables SOCRATA_USERNAME and SOCRATA_PASSWORD
+```
+
+This will return a hashtable like the following:
+
+```powershell
+@{
+    id              = "prx6-94ku"
+    name            = "Gross Domestic Product by County, 2021"
+    attribution     = "Bureau of Economic Analysis (BEA)"
+    # ...
+    customFields    = @{
+        Department  = @{
+            Name    = "Economic Development"
+            Office  = "Office of Data and Performance"
+        }
+    }
+    tags            = @( "economic", "performance", "gdp", "counties" )
+}
+```
+
+### Update dataset metadata
+
+```powershell
+Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Metadata"
+
+$Credentials = New-Object PSCredential(
+    $Env:SOCRATA_KEY_ID,
+    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+)
+
+$Fields = @{
+    description    = "An estimate of the value of goods and services by county."
+    category       = "Economy"
+    customFields   = @{
+        Department = @{
+            Team   = "Innovation and Analytics Team"
+        }
+    }
+}
+
+$Result = Update-Metadata `
+    -Domain "data.example.gov" `                   # Required
+    -DatasetId "prx6-94ku" `                       # Required
+    -Fields $Fields `                              # Required; must be a hashtable containing metadata fields as key-value pairs
+    -ValidateOnly $false `                         # Optional; $true or $false (default: $false)
+    -Strict $false `                               # Optional; $true or $false (default: $false)
+    -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variables SOCRATA_USERNAME and SOCRATA_PASSWORD
+```
 
 ## Tests
 
