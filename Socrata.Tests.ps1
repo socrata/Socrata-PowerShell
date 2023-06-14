@@ -18,9 +18,10 @@ BeforeAll {
 
     $Credentials = Get-SocrataTestingCredentials
 
-    function Get-RevisionJson ([String]$RevisionUrl, [String]$DatasetId) {
+    function Get-RevisionJson ([String]$RevisionUrl) {
         # Extract revision ID from frontend URL
         $RevisionUrl -Match $RevisionUrlPattern
+        $DatasetId = $Matches.dataset_id
         $RevisionId = $Matches.revision_id
         $RevisionApiUrl = "https://$TestDomain/api/publishing/v1/revision/$DatasetId/$RevisionId"
 
@@ -41,6 +42,24 @@ BeforeAll {
             -Authentication "Basic" `
             -Credential $Credentials
         $DeleteJson
+    }
+
+    function Confirm-RevisionSucceeded ([String]$RevisionUrl) {
+        $MaxAttempts = 20
+        $Interval = 3
+
+        $Attempt = 1
+        do {
+            $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl
+            Start-Sleep -Seconds $Interval
+            $Attempt += 1
+        } until ($RevisionJson.resource.closed_at -ne $null -or $Attempt -gt $MaxAttempts)
+
+        if ($Attempt -gt $MaxAttempts) {
+            throw "Exceeded maximum $MaxAttempts attempts when confirming revision succeeded: $RevisionUrl"
+        }
+
+        $RevisionJson
     }
 }
 
@@ -72,14 +91,12 @@ Describe "New-Dataset" {
             -Credentials $Credentials
 
         # Wait for the revision to finish applying, then check that it completed successfully
-        Start-Sleep -Seconds 30
         $RevisionUrl | Should -Match $RevisionUrlPattern
         $RevisionUrl -Match $RevisionUrlPattern
         $NewDatasetId = $Matches.dataset_id
-        $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $NewDatasetId
+        $RevisionJson = Confirm-RevisionSucceeded -RevisionUrl $RevisionUrl
 
         # Check that the update was successful
-        $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
         $RevisionJson.resource.permissions.scope | Should -BeExactly "site"
 
         # Delete newly created dataset
@@ -102,13 +119,11 @@ Describe "Update-Dataset" {
             -Credentials $Credentials
 
         # Wait for the revision to finish applying, then check that it completed successfully
-        Start-Sleep -Seconds 30
         $RevisionUrl | Should -Match $RevisionUrlPattern
-        $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $TestDatasetId
+        $RevisionJson = Confirm-RevisionSucceeded -RevisionUrl $RevisionUrl
 
         # Check that the revision was successful
         $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
-        $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
     }
 
     It "Given a Socrata domain, dataset ID, and CSV file, deletes rows in an existing dataset" {
@@ -124,13 +139,11 @@ Describe "Update-Dataset" {
             -Credentials $Credentials
 
         # Wait for the revision to finish applying, then check that it completed successfully
-        Start-Sleep -Seconds 30
         $RevisionUrl | Should -Match $RevisionUrlPattern
-        $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $TestDatasetId
+        $RevisionJson = Confirm-RevisionSucceeded -RevisionUrl $RevisionUrl
 
         # Check that the revision was successful
         $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
-        $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
     }
 
     It "Given a Socrata domain, dataset ID, and CSV file, replaces an existing dataset" {
@@ -146,13 +159,11 @@ Describe "Update-Dataset" {
             -Credentials $Credentials
 
         # Wait for the revision to finish applying, then check that it completed successfully
-        Start-Sleep -Seconds 30
         $RevisionUrl | Should -Match $RevisionUrlPattern
-        $RevisionJson = Get-RevisionJson -RevisionUrl $RevisionUrl -DatasetId $TestDatasetId
+        $RevisionJson = Confirm-RevisionSucceeded -RevisionUrl $RevisionUrl
 
         # Check that the revision was successful
         $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
-        $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
     }
 }
 
