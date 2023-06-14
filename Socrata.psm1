@@ -126,11 +126,14 @@ function Open-Revision {
         .PARAMETER Domain
             URL for a Socrata domain.
 
+        .PARAMETER DatasetId
+            Unique identifier (4x4) for an existing Socrata dataset.
+
         .PARAMETER Type
             Revision type ("update", "replace", or "delete").
 
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for an existing Socrata dataset.
+        .PARAMETER Credentials
+            Socrata credentials for authentication.
 
         .OUTPUTS
             PSObject
