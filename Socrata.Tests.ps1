@@ -106,48 +106,8 @@ Describe "New-Dataset" {
 
 
 Describe "Update-Dataset" {
-    It "Given a Socrata domain, dataset ID, and CSV file, updates an existing dataset" {
-        $RevisionType = "update"
-
-        # Execute function
-        $RevisionUrl = Update-Dataset `
-            -Domain $TestDomain `
-            -DatasetId $TestDatasetId `
-            -Filepath $CsvFilepath `
-            -Type $RevisionType `
-            -Publish $true `
-            -Credentials $Credentials
-
-        # Wait for the revision to finish applying, then check that it completed successfully
-        $RevisionUrl | Should -Match $RevisionUrlPattern
-        $RevisionJson = Confirm-RevisionSucceeded -RevisionUrl $RevisionUrl
-
-        # Check that the revision was successful
-        $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
-    }
-
-    It "Given a Socrata domain, dataset ID, and CSV file, deletes rows in an existing dataset" {
-        $RevisionType = "delete"
-
-        # Execute function
-        $RevisionUrl = Update-Dataset `
-            -Domain $TestDomain `
-            -DatasetId $TestDatasetId `
-            -Filepath $CsvFilepath `
-            -Type $RevisionType `
-            -Publish $true `
-            -Credentials $Credentials
-
-        # Wait for the revision to finish applying, then check that it completed successfully
-        $RevisionUrl | Should -Match $RevisionUrlPattern
-        $RevisionJson = Confirm-RevisionSucceeded -RevisionUrl $RevisionUrl
-
-        # Check that the revision was successful
-        $RevisionJson.resource.action.type | Should -BeExactly $RevisionType
-    }
-
-    It "Given a Socrata domain, dataset ID, and CSV file, replaces an existing dataset" {
-        $RevisionType = "replace"
+    It "Given a Socrata domain, dataset ID, and CSV file, performs an update of type '<_>'" -ForEach "update", "delete", "replace" {
+        $RevisionType = $_
 
         # Execute function
         $RevisionUrl = Update-Dataset `
