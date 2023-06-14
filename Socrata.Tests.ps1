@@ -155,3 +155,41 @@ Describe "Update-Dataset" {
         $RevisionJson.resource.closed_at | Should -Not -BeNullOrEmpty
     }
 }
+
+Describe "Get-Metadata" {
+    It "Given a Socrata domain and asset ID, gets the asset's metadata" {
+        # Execute function
+        $MetadataJson = Get-Metadata `
+            -Domain $TestDomain `
+            -DatasetId $TestDatasetId `
+            -Credentials $Credentials
+
+        # Check that the metadata update was successful
+        $MetadataJson.name | Should -Not -BeNullOrEmpty
+        $MetadataJson.customFields.TestFieldset.TestField | Should -Not -BeNullOrEmpty
+    }
+}
+
+
+Describe "Update-Metadata" {
+    It "Given a Socrata domain and asset ID, and a metadata object, updates the asset's metadata" {
+        $RandomGuid = (New-Guid).ToString()
+        $Fields = @{
+            "customFields" = @{
+                "TestFieldset" = @{
+                    "TestField" = $RandomGuid
+                }
+            }
+        }
+
+        # Execute function
+        $MetadataJson = Update-Metadata `
+            -Domain $TestDomain `
+            -DatasetId $TestDatasetId `
+            -Fields $Fields `
+            -Credentials $Credentials
+
+        # Check that the metadata update was successful
+        $MetadataJson.metadata.customFields.TestFieldset.TestField | Should -BeExactly $RandomGuid
+    }
+}

@@ -931,9 +931,10 @@ function Update-Metadata {
 
         # Prepare HTTP request to update metadata
         $BaseMetadataUrl = "https://$Domain/api/views/metadata/v1/$DatasetId"
-        $QueryString = "validateOnly=$ValidateOnly&strict=$Strict".
-        $MetadataUrl = "$BaseMetadataUrl?$QueryString"
+        $QueryString = "validateOnly=$ValidateOnly&strict=$Strict"
+        $MetadataUrl = "${BaseMetadataUrl}?${QueryString}"
         $Headers = @{ "Authorization" = "Basic $AuthString" }
+        $Body = $Fields | ConvertTo-Json -Compress
 
         # Send request and return response JSON object
         Write-Verbose "Updating metadata: $MetadataUrl"
@@ -942,7 +943,7 @@ function Update-Metadata {
             -Uri $MetadataUrl `
             -Headers $Headers `
             -ContentType "application/json" `
-            -Body $Fields
+            -Body $Body
         $ResponseJson
     }
 }
