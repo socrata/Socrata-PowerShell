@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.2.0]
+
+* Added `Get-Metadata` and `Update-Metadata` functions for working with dataset metadata.
+
 ## [2.1.2]
 
 * Added support for `delete` revisions.
@@ -20,6 +24,7 @@
 
 * First major release.
 
+[2.2.0]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.2.0
 [2.1.2]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.1.2
 [2.1.1]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.1.1
 [2.1.0]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.1.0
