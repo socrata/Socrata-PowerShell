@@ -275,9 +275,6 @@ function Complete-Revision {
         [Parameter(Mandatory = $false)][String]$Activity = $MyInvocation.MyCommand
     )
     Process {
-        # Initialize client
-        $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
-
         # Get values from revision
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
