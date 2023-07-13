@@ -205,21 +205,15 @@ function Wait-ForSuccess {
     <#
         .SYNOPSIS
             Try and retry a function call at a specified interval until it completes successfully.
-
-        .PARAMETER Action
-            Function call to try.
-
-        .PARAMETER Interval
-            Length of interval (in seconds) to wait between attempts.
-
-        .PARAMETER MaxAttempts
-            Maximum number of retries to attempt before giving up.
     #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([PSCustomObject])]
     Param(
+        # Function call to try
         [Parameter(Mandatory = $true)][Action]$Action,
+        # Length of interval (in seconds) to wait between attempts
         [Parameter(Mandatory = $false)][Int16]$Interval = 10,
+        # Maximum number of retries to attempt before giving up
         [Parameter(Mandatory = $false)][Int16]$MaxAttempts = 8640
     )
     Process {
@@ -259,41 +253,26 @@ function New-Dataset {
         .SYNOPSIS
             Create a new dataset on a Socrata domain by uploading a file.
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER Name
-            Name for the new dataset.
-
-        .PARAMETER Filepath
-            Path representing the data file to upload.
-
-        .PARAMETER Filetype
-            Filetype for the data file to upload ("csv", "tsv", "xls", "xlsx", "shapefile", "kml",
-            or "geojson").
-
-        .PARAMETER Audience
-            Audience for published dataset: "private", "site", or "public".
-
-        .PARAMETER Publish
-            Whether to publish the dataset or leave it as an unpublished revision.
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
         .OUTPUTS
             String
     #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([String])]
     Param(
+        # URL for a Socrata domain
         [Parameter(Mandatory = $true)][String]$Domain,
+        # Name for the new dataset
         [Parameter(Mandatory = $true)][String]$Name,
+        # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
+        # Filetype for the data file to upload
         [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson")][String]$Filetype = $null,
+        # Audience for published dataset
         [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String] `
             $Audience = "private",
+        # Whether to publish the dataset or leave it as an unpublished revision
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
+        # Socrata credentials for authentication
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
@@ -359,40 +338,25 @@ function Update-Dataset {
         .SYNOPSIS
             Update an existing dataset on a Socrata domain by uploading a file.
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for a Socrata dataset.
-
-        .PARAMETER Type
-            Revision type ("update", "replace", or "delete").
-
-        .PARAMETER Filepath
-            Path representing the data file to upload.
-
-        .PARAMETER Filetype
-            Filetype for the data file to upload ("csv", "tsv", "xls", "xlsx", "shapefile", "kml",
-            "kmz", or "geojson").
-
-        .PARAMETER Publish
-            Whether to publish the dataset or leave it as an unpublished revision.
-
-        .PARAMETER Credentials
-            Socrata credentials for authentication.
-
         .OUTPUTS
             String
     #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([String])]
     Param(
+        # URL for a Socrata domain
         [Parameter(Mandatory = $true)][String]$Domain,
+        # Unique identifier (4x4) for a Socrata dataset
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        # Revision type
         [Parameter(Mandatory = $true)][ValidateSet("update", "replace", "delete")][String]$Type,
+        # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
+        # Filetype for the data file to upload
         [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson")][String]$Filetype = $null,
+        # Whether to publish the dataset or leave it as an unpublished revision
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
+        # Socrata credentials for authentication
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
@@ -500,20 +464,17 @@ function Get-Metadata {
         .SYNOPSIS
             Get the metadata for a Socrata asset and return the response JSON.
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for an existing Socrata dataset.
-
         .OUTPUTS
             PSObject
     #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([PSObject])]
     Param(
+        # URL for a Socrata domain
         [Parameter(Mandatory = $true)][String]$Domain,
+        # Unique identifier (4x4) for an existing Socrata dataset
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        # Socrata credentials for authentication
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
@@ -543,34 +504,23 @@ function Update-Metadata {
         .SYNOPSIS
             Update the metadata for a Socrata asset and return the response JSON.
 
-        .PARAMETER Domain
-            URL for a Socrata domain.
-
-        .PARAMETER DatasetId
-            Unique identifier (4x4) for an existing Socrata dataset.
-
-        .PARAMETER Fields
-            Object containing metadata fields to use in updating the asset.
-
-        .PARAMETER ValidateOnly
-            Whether to simply perform validation on the input fields without modifying the asset.
-            The asset's metadata is then returned as it would be if it had been modified, along
-            with a list of errors and warnings.
-
-        .PARAMETER Strict
-            Whether to perform strict validation on the input fields.
-
         .OUTPUTS
             PSObject
     #>
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([PSObject])]
     Param(
+        # URL for a Socrata domain
         [Parameter(Mandatory = $true)][String]$Domain,
+        # Unique identifier (4x4) for an existing Socrata dataset
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        # Object containing metadata fields to use in updating the asset
         [Parameter(Mandatory = $true)][PSObject]$Fields,
+        # Whether to simply perform validation on the input fields without modifying the asset
         [Parameter(Mandatory = $false)][Boolean]$ValidateOnly = $false,
+        # Whether to perform strict validation on the input fields
         [Parameter(Mandatory = $false)][Boolean]$Strict = $false,
+        # Socrata credentials for authentication
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
