@@ -490,3 +490,5 @@ function Update-Metadata {
         $ResponseJson
     }
 }
+
+Export-ModuleMember -Function New-Dataset, Update-Dataset, Get-Metadata, Update-Metadata
