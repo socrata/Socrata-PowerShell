@@ -18,13 +18,13 @@ class SocrataClient {
         $this.Auth = if (-not $Auth) { $this.GetAuthFromEnvironment() } else { $Auth }
     }
 
-    [String]GetAuthFromEnvironment() {
-        Write-Debug "Failed to obtain Socrata credentials from parameter; looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+    [PSCredential]GetAuthFromEnvironment() {
+        Write-Debug "Looking up environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
         $SocrataUsername = $Env:SOCRATA_USERNAME
         $SocrataPassword = ConvertTo-SecureString -String $Env:SOCRATA_PASSWORD -AsPlainText -Force
 
         if (-not $SocrataUsername -or -not $SocrataPassword) {
-            throw "Failed to obtain Socrata credentials from parameters or from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
+            throw "Failed to obtain Socrata credentials from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
         } else {
             Write-Warning "Obtained credentials from environment variables SOCRATA_USERNAME and SOCRATA_PASSWORD"
         }

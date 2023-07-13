@@ -63,22 +63,6 @@ BeforeAll {
     }
 }
 
-Describe "Get-SocrataCredentials" {
-    It "Given no explicitly passed credentials, obtains Socrata credentials from the environment" {
-        $Credentials = Get-SocrataCredentials
-        $Credentials.UserName | Should -BeExactly $Env:SOCRATA_USERNAME
-    }
-
-    It "Given explicitly passed credentials, returns those same credentials" {
-        $TestCredentials = New-Object PSCredential(
-            "some_username",
-            (ConvertTo-SecureString -String "password" -AsPlainText -Force)
-        )
-        $Credentials = Get-SocrataCredentials -Credentials $TestCredentials
-        $Credentials.UserName | Should -BeExactly $TestCredentials.UserName
-    }
-}
-
 Describe "Socrata-PowerShell" {
     It "Does not trigger PSScriptAnalyzer warnings or errors" {
         Import-Module "PSScriptAnalyzer"
@@ -90,6 +74,26 @@ Describe "Socrata-PowerShell" {
                 -IncludeDefaultRules
         )
         $ScriptAnalysisOutput.Length | Should -BeExactly 0
+    }
+}
+
+Describe "SocrataClient" {
+    It "Given no explicitly passed credentials, obtains Socrata credentials from the environment" {
+        & (Get-Module "Socrata") {
+            $Client = New-Object SocrataClient -ArgumentList "example.domain.com"
+            $Client.Auth.UserName | Should -BeExactly $Env:SOCRATA_USERNAME
+        }
+    }
+
+    It "Given explicitly passed credentials, returns those same credentials" {
+        & (Get-Module "Socrata") {
+            $Auth = New-Object PSCredential(
+                "example_username",
+                (ConvertTo-SecureString -String "example_password" -AsPlainText -Force)
+            )
+            $Client = New-Object SocrataClient -ArgumentList "example.domain.com", $Auth
+            $Client.Auth.UserName | Should -BeExactly $Auth.UserName
+        }
     }
 }
 
@@ -117,7 +121,6 @@ Describe "New-Dataset" {
         Remove-Dataset -DatasetId $NewDatasetId
     }
 }
-
 
 Describe "Update-Dataset" {
     It "Given a Socrata domain, dataset ID, and CSV file, performs an update of type '<_>'" -ForEach "update", "delete", "replace" {
@@ -154,7 +157,6 @@ Describe "Get-Metadata" {
         $MetadataJson.customFields.TestFieldset.TestField | Should -Not -BeNullOrEmpty
     }
 }
-
 
 Describe "Update-Metadata" {
     It "Given a Socrata domain and asset ID, and a metadata object, updates the asset's metadata" {
