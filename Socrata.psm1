@@ -248,7 +248,7 @@ function Wait-ForSuccess {
     }
 }
 
-function Complete-RevisionCycle {
+function Complete-Revision {
     <#
         .SYNOPSIS
             Complete a revision publication cycle on a Socrata domain.
@@ -272,7 +272,9 @@ function Complete-RevisionCycle {
         # Audience for published dataset
         [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String]$Audience = "private",
         # Whether to publish the dataset or leave it as an unpublished revision
-        [Parameter(Mandatory = $false)][Boolean]$Publish = $true
+        [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
+        # Activity from which this function was called
+        [Parameter(Mandatory = $false)][String]$Activity = $MyInvocation.MyCommand
     )
     Process {
         # Initialize client
@@ -284,13 +286,13 @@ function Complete-RevisionCycle {
 
         # Create source on revision
         $Status = "Creating source..."
-        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 20
+        Write-Progress -Activity $Activity -Status $Status -PercentComplete 20
         [PSObject]$Source = $Client.AddSource($DatasetId, $RevisionId)
         [Int64]$SourceId = $Source.resource.id
 
         # Upload file to source
         $Status = "Uploading file $Filepath..."
-        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 40
+        Write-Progress -Activity $Activity -Status $Status -PercentComplete 40
         [PSObject]$Upload = $Client.AddUpload($SourceId, $Filepath, $Filetype)
 
         # Get latest input schema based on highest ID
@@ -306,7 +308,7 @@ function Complete-RevisionCycle {
 
         # Wait for schema to finish processing
         $Status = "Processing data..."
-        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 60
+        Write-Progress -Activity $Activity -Status $Status -PercentComplete 60
         [Boolean]$SchemaSucceeded = Wait-ForSuccess `
             -Action { $Client.AssertSchemaSucceeded($SourceId, $LatestInputSchemaId) } `
             -ErrorAction "Stop"
@@ -314,13 +316,13 @@ function Complete-RevisionCycle {
         # Publish revision
         if ($Publish -eq $true) {
             $Status = "Publishing revision..."
-            Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 80
+            Write-Progress -Activity $Activity -Status $Status -PercentComplete 80
             [PSObject]$PublishedRevision = $Client.PublishRevision($DatasetId, $RevisionId)
         }
 
         # Return revision URL
         $Status = "Complete: $RevisionUrl"
-        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 100
+        Write-Progress -Activity $Activity -Status $Status -PercentComplete 100
         $RevisionUrl
     }
 }
@@ -367,12 +369,13 @@ function New-Dataset {
         [PSObject]$Revision = $Client.SetAudience($DatasetId, $RevisionId, $Audience)
 
         # Complete revision cycle and return revision URL
-        Complete-RevisionCycle `
+        Complete-Revision `
             -Client $Client `
             -DatasetId $DatasetId `
             -Revision $Revision `
             -Filepath $Filepath `
-            -Publish $Publish
+            -Publish $Publish `
+            -Activity $MyInvocation.MyCommand
     }
 }
 
@@ -414,12 +417,13 @@ function Update-Dataset {
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
         # Complete revision cycle and return revision URL
-        Complete-RevisionCycle `
+        Complete-Revision `
             -Client $Client `
             -DatasetId $DatasetId `
             -Revision $Revision `
             -Filepath $Filepath `
-            -Publish $Publish
+            -Publish $Publish `
+            -Activity $MyInvocation.MyCommand
     }
 }
 
