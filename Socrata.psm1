@@ -268,9 +268,7 @@ function Complete-Revision {
         # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         # Filetype for the data file to upload
-        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson")][String]$Filetype = $null,
-        # Audience for published dataset
-        [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String]$Audience = "private",
+        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson", "")][String]$Filetype = $null,
         # Whether to publish the dataset or leave it as an unpublished revision
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
         # Activity from which this function was called
@@ -345,7 +343,7 @@ function New-Dataset {
         # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         # Filetype for the data file to upload
-        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson")][String]$Filetype = $null,
+        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson", "")][String]$Filetype = $null,
         # Audience for published dataset
         [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String]$Audience = "private",
         # Whether to publish the dataset or leave it as an unpublished revision
@@ -374,6 +372,7 @@ function New-Dataset {
             -DatasetId $DatasetId `
             -Revision $Revision `
             -Filepath $Filepath `
+            -Filetype $Filetype `
             -Publish $Publish `
             -Activity $MyInvocation.MyCommand
     }
@@ -399,7 +398,7 @@ function Update-Dataset {
         # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         # Filetype for the data file to upload
-        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson")][String]$Filetype = $null,
+        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "kmz", "geojson", "")][String]$Filetype = $null,
         # Whether to publish the dataset or leave it as an unpublished revision
         [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
         # Socrata credentials for authentication
@@ -422,6 +421,7 @@ function Update-Dataset {
             -DatasetId $DatasetId `
             -Revision $Revision `
             -Filepath $Filepath `
+            -Filetype $Filetype `
             -Publish $Publish `
             -Activity $MyInvocation.MyCommand
     }
