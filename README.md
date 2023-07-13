@@ -18,14 +18,12 @@ A PowerShell module for creating and updating datasets on a Socrata domain.
 
 ## Installation
 
-To install this module:
+This module requires PowerShell 5.1 or greater. To install, follow these steps:
 
 1. Download this repository [as a ZIP] or `git clone` it locally
-2. Unzip the repository, if necessary
+2. Unzip the directory, if necessary
 3. Move the `Socrata-PowerShell` directory to wherever you'd like to keep it
-4. [Import the module] in your PowerShell scripts like so: `Import-Module -Name "./Socrata-PowerShell/Socrata.psm1"`
-
-Be sure to edit the `-Name` parameter value so it points to the correct path for the `Socrata.psm1` file in your environment.
+4. [Import the module] in your PowerShell scripts like so: `Import-Module "./Socrata-PowerShell/Socrata.psm1"` (updating the import filepath as needed)
 
 For detailed information on installing PowerShell modules locally and globally, see [Installing a PowerShell Module].
 
@@ -35,36 +33,35 @@ For detailed information on installing PowerShell modules locally and globally, 
 
 ## Quickstart
 
-Here's a simple PowerShell script that performs a full replace on an existing dataset from a CSV file:
+Here's a script that performs a full replace of an existing dataset using a CSV file:
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
-$RevisionUrl = Update-Dataset `
+$Url = Update-Dataset `
     -Domain "data.example.gov" `
     -DatasetId "fej7-9vb3" `
     -Type "replace" `
-    -Publish $true `
     -Filepath "\\treasurer\financial_data\budget.csv" `
     -ErrorAction "Stop"
 
-Write-Host "Update complete! See dataset revision here: $RevisionUrl"
+Write-Host "Update complete! See dataset here: $Url"
 ```
 
 ## Authentication
 
-To use this library, you must have access to a Socrata user account with permissions to create and/or update datasets on a Socrata domain.
+To use this module, you must have access to a Socrata user account with permissions to create and/or update datasets on a Socrata domain.
 
 While Socrata APIs will accept a username and password as HTTP Basic Auth credentials, it's best to [generate a pair of API keys] and use those instead.
 
-By default, this package will automatically look for Socrata credentials under the environment variables `SOCRATA_USERNAME` and `SOCRATA_PASSWORD`. However, you can also supply them explicitly via a `PSCredential`:
+By default, this module will automatically look for credentials under the environment variables `SOCRATA_USERNAME` and `SOCRATA_PASSWORD`. However, you can also supply credentials explicitly by passing a `PSCredential` to the `-Credentials` parameter:
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
 $Credentials = New-Object PSCredential(
-    $Env:SOCRATA_KEY_ID,
-    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
+    $Env:API_KEY,
+    ($Env:API_SECRET | ConvertTo-SecureString -AsPlainText -Force)
 )
 
 Update-Dataset `
@@ -84,14 +81,9 @@ As a reminder, do not store secure credentials in a script or commit them to ver
 ### Update an existing dataset
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Dataset"
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
-$Credentials = New-Object PSCredential(
-    $Env:SOCRATA_KEY_ID,
-    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
-)
-
-$Url = Update-Dataset `
+Update-Dataset `
     -Domain "data.example.gov" `                   # Required
     -DatasetId "c2xb-y8f6" `                       # Required
     -Type "update" `                               # Required; "update" (upsert/append), "replace" (full replace), or "delete" (delete rows)
@@ -103,20 +95,15 @@ $Url = Update-Dataset `
 
 ### Create a new dataset
 
-Note: it's not unusual to run into schema errors and data quality issues when creating a dataset programmatically. A good workaround is to create a new dataset using the [Data Management Experience] user interface, add any desired fixes or schema changes, then publish. After that, you can schedule programmatic [updates] for the dataset going forward.
+Note: it's common to run into schema errors and data quality issues when first creating a Socrata dataset programmatically. A better approach is to create a new dataset using the [Data Management Experience] user interface, implement any desired fixes or schema changes, then publish. After that, you can schedule programmatic [updates] for the dataset going forward. However, in cases where dataset creation must be automated, `New-Dataset` may be useful:
 
 [Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
 [updates]: #update-an-existing-dataset
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
-$Credentials = New-Object PSCredential(
-    $Env:SOCRATA_KEY_ID,
-    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
-)
-
-$Url = New-Dataset `
+New-Dataset `
     -Domain "data.example.gov" `                   # Required
     -Name "Hospital Bed Availability by County" `  # Required
     -Filepath "\\datasets\BEDS_AVAIL.xlsx" `       # Required
@@ -128,39 +115,30 @@ $Url = New-Dataset `
 
 ### Create a dataset draft
 
-It is often desired to create a draft revision of a new or existing dataset without publishing the draft. For example, you may want to manually inspect a dataset in the [Data Management Experience] user interface before publishing.
-
-The functions `Update-Dataset` and `New-Dataset` both accept a `-Publish` parameter that, when set to `$false`, will leave the revision in draft (unpublished) state.
+Sometimes it's necessary to create a draft revision of a new or existing dataset without publishing the draft. `Update-Dataset` and `New-Dataset` both accept an optional `-Publish` parameter that, when set to `$false`, will leave the revision in draft (unpublished) state.
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "New-Dataset"
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
-$Url = New-Dataset `
+New-Dataset `
     -Domain "data.example.gov" `                   # Required
     -Name "Assisted Living Facilities by State" `  # Required
     -Filepath "datasets\assisted_living.csv" `     # Required
     -Publish $false                                # Optional; $true or $false (default: $true)
 ```
 
-[Data Management Experience]: https://support.socrata.com/hc/en-us/articles/115016067067-Using-the-Socrata-Data-Management-Experience
-
 ### Get dataset metadata
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Get-Metadata"
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
-$Credentials = New-Object PSCredential(
-    $Env:SOCRATA_KEY_ID,
-    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
-)
-
-$Fields = Get-Metadata `
+Get-Metadata `
     -Domain "data.example.gov" `                   # Required
     -DatasetId "prx6-94ku" `                       # Required
     -Credentials $Credentials                      # Optional; if not supplied, this is looked up from the env variables SOCRATA_USERNAME and SOCRATA_PASSWORD
 ```
 
-This will return a hashtable like the following:
+This will return an object like the following:
 
 ```powershell
 @{
@@ -181,12 +159,7 @@ This will return a hashtable like the following:
 ### Update dataset metadata
 
 ```powershell
-Import-Module -Name "./Socrata-PowerShell/Socrata.psm1" -Function "Update-Metadata"
-
-$Credentials = New-Object PSCredential(
-    $Env:SOCRATA_KEY_ID,
-    ($Env:SOCRATA_KEY_SECRET | ConvertTo-SecureString -AsPlainText -Force)
-)
+Import-Module "./Socrata-PowerShell/Socrata.psm1"
 
 $Fields = @{
     description    = "An estimate of the value of goods and services by county."
@@ -198,7 +171,7 @@ $Fields = @{
     }
 }
 
-$Result = Update-Metadata `
+Update-Metadata `
     -Domain "data.example.gov" `                   # Required
     -DatasetId "prx6-94ku" `                       # Required
     -Fields $Fields `                              # Required; must be a hashtable containing metadata fields as key-value pairs
