@@ -79,6 +79,20 @@ Describe "Get-SocrataCredentials" {
     }
 }
 
+Describe "Socrata-PowerShell" {
+    It "Does not trigger PSScriptAnalyzer warnings or errors" {
+        Import-Module "PSScriptAnalyzer"
+        $ScriptAnalysisOutput = @(
+            Invoke-ScriptAnalyzer `
+                -Path "$PSScriptRoot/Socrata.psm1" `
+                -Severity @( "Warning", "Error" ) `
+                -CustomRulePath $PSScriptRoot `
+                -IncludeDefaultRules
+        )
+        $ScriptAnalysisOutput.Length | Should -BeExactly 0
+    }
+}
+
 Describe "New-Dataset" {
     It "Given a Socrata domain and CSV file, creates a new dataset" {
         # Execute function

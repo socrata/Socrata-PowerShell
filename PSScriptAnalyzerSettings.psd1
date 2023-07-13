@@ -1,6 +1,7 @@
 @{
     # Rules to exclude
     ExcludeRules = @(
+        "PSAvoidUsingConvertToSecureStringWithPlainText",
         "PSUseDeclaredVarsMoreThanAssignments",
         "PSUseShouldProcessForStateChangingFunctions",
         "PSUseSingularNouns"

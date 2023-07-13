@@ -222,7 +222,7 @@ For the tests to pass, the following environment variables must be set:
 * `SOCRATA_USERNAME`
 * `SOCRATA_PASSWORD`
 
-To run script analysis, use [PSScriptAnalyzer]:
+Script analysis is included in the test suite. To run script analysis separately, use [PSScriptAnalyzer]:
 
 ```powershell
 Invoke-ScriptAnalyzer -Path "./Socrata.psm1"
