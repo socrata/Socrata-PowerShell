@@ -248,10 +248,10 @@ function Wait-ForSuccess {
     }
 }
 
-function New-Dataset {
+function Complete-RevisionCycle {
     <#
         .SYNOPSIS
-            Create a new dataset on a Socrata domain by uploading a file.
+            Complete a revision publication cycle on a Socrata domain.
 
         .OUTPUTS
             String
@@ -259,36 +259,28 @@ function New-Dataset {
     [CmdletBinding(PositionalBinding = $false)]
     [OutputType([String])]
     Param(
-        # URL for a Socrata domain
-        [Parameter(Mandatory = $true)][String]$Domain,
-        # Name for the new dataset
-        [Parameter(Mandatory = $true)][String]$Name,
+        # Socrata client instance
+        [Parameter(Mandatory = $true)][SocrataClient]$Client,
+        # Unique identifier (4x4) for a Socrata dataset
+        [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
+        # Revision object
+        [Parameter(Mandatory = $true)][PSObject]$Revision,
         # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         # Filetype for the data file to upload
         [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson")][String]$Filetype = $null,
         # Audience for published dataset
-        [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String] `
-            $Audience = "private",
+        [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String]$Audience = "private",
         # Whether to publish the dataset or leave it as an unpublished revision
-        [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
-        # Socrata credentials for authentication
-        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
+        [Parameter(Mandatory = $false)][Boolean]$Publish = $true
     )
     Process {
         # Initialize client
         $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
 
-        # Create revision
-        $Status = "Creating revision..."
-        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 1
-        [PSObject]$Revision = $Client.NewRevision($Name)
-        [String]$DatasetId = $Revision.resource.fourfour
+        # Get values from revision
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
-
-        # Set audience on revision
-        [PSObject]$Revision = $Client.SetAudience($DatasetId, $RevisionId, $Audience)
 
         # Create source on revision
         $Status = "Creating source..."
@@ -333,6 +325,57 @@ function New-Dataset {
     }
 }
 
+function New-Dataset {
+    <#
+        .SYNOPSIS
+            Create a new dataset on a Socrata domain by uploading a file.
+
+        .OUTPUTS
+            String
+    #>
+    [CmdletBinding(PositionalBinding = $false)]
+    [OutputType([String])]
+    Param(
+        # URL for a Socrata domain
+        [Parameter(Mandatory = $true)][String]$Domain,
+        # Name for the new dataset
+        [Parameter(Mandatory = $true)][String]$Name,
+        # Path representing the data file to upload
+        [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
+        # Filetype for the data file to upload
+        [Parameter(Mandatory = $false)][ValidateSet("csv", "tsv", "xls", "xlsx", "shapefile", "kml", "geojson")][String]$Filetype = $null,
+        # Audience for published dataset
+        [Parameter(Mandatory = $false)][ValidateSet("private", "site", "public")][String]$Audience = "private",
+        # Whether to publish the dataset or leave it as an unpublished revision
+        [Parameter(Mandatory = $false)][Boolean]$Publish = $true,
+        # Socrata credentials for authentication
+        [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
+    )
+    Process {
+        # Initialize client
+        $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
+
+        # Create revision
+        $Status = "Creating revision..."
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 1
+        [PSObject]$Revision = $Client.NewRevision($Name)
+        [String]$DatasetId = $Revision.resource.fourfour
+        [Int64]$RevisionId = $Revision.resource.revision_seq
+        [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
+
+        # Set audience on revision
+        [PSObject]$Revision = $Client.SetAudience($DatasetId, $RevisionId, $Audience)
+
+        # Complete revision cycle and return revision URL
+        Complete-RevisionCycle `
+            -Client $Client `
+            -DatasetId $DatasetId `
+            -Revision $Revision `
+            -Filepath $Filepath `
+            -Publish $Publish
+    }
+}
+
 function Update-Dataset {
     <#
         .SYNOPSIS
@@ -360,102 +403,23 @@ function Update-Dataset {
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
+        # Initialize client
+        $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
 
         # Create revision
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Creating revision..." `
-            -PercentComplete 1
-        [PSObject]$Revision = Open-Revision `
-            -Domain $Domain `
-            -DatasetId $DatasetId `
-            -Type $Type `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
+        $Status = "Creating revision..."
+        Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 1
+        [PSObject]$Revision = $Client.OpenRevision($DatasetId, $Type)
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
-        # Create source on revision
-        Write-Progress `
-        -Activity $MyInvocation.MyCommand `
-        -Status "Creating source..." `
-        -PercentComplete 20
-        [PSObject]$Source = Add-Source `
-            -Domain $Domain `
+        # Complete revision cycle and return revision URL
+        Complete-RevisionCycle `
+            -Client $Client `
             -DatasetId $DatasetId `
-            -RevisionId $RevisionId `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-        [Int64]$SourceId = $Source.resource.id
-
-        # Upload file to source
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Uploading file $Filepath..." `
-            -PercentComplete 40
-        if (-not $Filetype) {
-            [PSObject]$Upload = Add-Upload `
-                -Domain $Domain `
-                -SourceId $SourceId `
-                -Filepath $Filepath `
-                -Credentials $Credentials `
-                -ErrorAction "Stop"
-        }
-        else {
-            [PSObject]$Upload = Add-Upload `
-                -Domain $Domain `
-                -SourceId $SourceId `
-                -Filepath $Filepath `
-                -Filetype $Filetype `
-                -Credentials $Credentials `
-                -ErrorAction "Stop"
-        }
-
-        # Get latest input schema based on highest ID
-        try {
-            [Array]$SortedInputSchemas = $Upload.resource.schemas | Sort-Object `
-                -Property "id" `
-                -Descending
-            [Int64]$LatestInputSchemaId = $SortedInputSchemas[0].id
-        }
-        catch [Exception] {
-            throw "Failed to obtain ID for latest input schema; halting execution"
-        }
-
-        # Wait for schema to finish processing
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Processing data..." `
-            -PercentComplete 60
-        [Boolean]$SchemaSucceeded = Wait-ForSuccess `
-            -Action { Assert-SchemaSucceeded `
-                -Domain $Domain `
-                -SourceId $SourceId `
-                -InputSchemaId $LatestInputSchemaId `
-                -Credentials $Credentials `
-                -ErrorAction "Stop" } `
-            -ErrorAction "Stop"
-
-        # Publish revision
-        if ($Publish -eq $true) {
-            Write-Progress `
-                -Activity $MyInvocation.MyCommand `
-                -Status "Publishing revision..." `
-                -PercentComplete 80
-            [PSObject]$PublishedRevision = Publish-Revision `
-                -Domain $Domain `
-                -DatasetId $DatasetId `
-                -RevisionId $RevisionId `
-                -Credentials $Credentials
-        }
-
-        Write-Progress `
-            -Activity $MyInvocation.MyCommand `
-            -Status "Complete: $RevisionUrl" `
-            -PercentComplete 100
-        $RevisionUrl
+            -Revision $Revision `
+            -Filepath $Filepath `
+            -Publish $Publish
     }
 }
 
