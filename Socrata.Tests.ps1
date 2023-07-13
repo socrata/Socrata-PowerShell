@@ -6,7 +6,6 @@ BeforeAll {
     # Set constants
     $TestDomain = $Env:SOCRATA_POWERSHELL_TEST_DOMAIN
     $TestDatasetId = $Env:SOCRATA_POWERSHELL_TEST_DATASET_ID
-    $CsvFilePath = "$PSScriptRoot/Test-Data/iris_sample.csv"
     $RevisionUrlPattern = "/d/(?<dataset_id>\w{4}-\w{4})/revisions/(?<revision_id>\d+)$"
 
     function Get-SocrataTestingCredentials {
@@ -17,6 +16,28 @@ BeforeAll {
     }
 
     $Credentials = Get-SocrataTestingCredentials
+
+    function Write-TemporaryCsvFile() {
+        $CsvData = (
+            "row_id,sepal_length,sepal_width,petal_length,petal_width,species`n" +
+            "1,5.7,2.9,4.2,1.3,versicolor"
+        )
+
+        # Create temporary file
+        $TemporaryCsvFile = New-TemporaryFile
+        $TemporaryDir = $TemporaryCsvFile.Directory
+
+        # Rename file to use .csv extension
+        $TemporaryCsvFilepath = Join-Path $TemporaryDir.FullName "$($TemporaryCsvFile.Name).csv"
+        $TemporaryCsvFile.MoveTo($TemporaryCsvFilepath)
+
+        # Write CSV data to file
+        $CsvData | Out-File -FilePath $TemporaryCsvFilepath
+
+        $TemporaryCsvFilepath
+    }
+
+    $CsvFilepath = Write-TemporaryCsvFile
 
     function Get-RevisionJson ([String]$RevisionUrl) {
         # Extract revision ID from frontend URL
@@ -190,4 +211,8 @@ Describe "Update-Metadata" {
         # Check that the metadata update was successful
         $MetadataJson.metadata.customFields.TestFieldset.TestField | Should -BeExactly $RandomGuid
     }
+}
+
+AfterAll {
+    Remove-Item $CsvFilepath
 }
