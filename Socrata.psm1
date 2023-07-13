@@ -190,7 +190,7 @@ class SocrataClient {
         return $SchemaSucceeded
     }
 
-    [PSObject]PublishRevision([String]$DatasetId, [Int64]$RevisionId) {
+    [PSCustomObject]PublishRevision([String]$DatasetId, [Int64]$RevisionId) {
         $Route = "/api/publishing/v1/revision/$DatasetId/$RevisionId/apply"
         $Body = @{ "resource" = @{ "id" = $RevisionId } }
 
@@ -264,7 +264,7 @@ function Complete-Revision {
         # Unique identifier (4x4) for a Socrata dataset
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         # Revision object
-        [Parameter(Mandatory = $true)][PSObject]$Revision,
+        [Parameter(Mandatory = $true)][PSCustomObject]$Revision,
         # Path representing the data file to upload
         [Parameter(Mandatory = $true)][ValidateScript({ Test-Path $_ })][String]$Filepath,
         # Filetype for the data file to upload
@@ -282,13 +282,13 @@ function Complete-Revision {
         # Create source on revision
         $Status = "Creating source..."
         Write-Progress -Activity $Activity -Status $Status -PercentComplete 20
-        [PSObject]$Source = $Client.AddSource($DatasetId, $RevisionId)
+        [PSCustomObject]$Source = $Client.AddSource($DatasetId, $RevisionId)
         [Int64]$SourceId = $Source.resource.id
 
         # Upload file to source
         $Status = "Uploading file $Filepath..."
         Write-Progress -Activity $Activity -Status $Status -PercentComplete 40
-        [PSObject]$Upload = $Client.AddUpload($SourceId, $Filepath, $Filetype)
+        [PSCustomObject]$Upload = $Client.AddUpload($SourceId, $Filepath, $Filetype)
 
         # Get latest input schema based on highest ID
         try {
@@ -312,7 +312,7 @@ function Complete-Revision {
         if ($Publish -eq $true) {
             $Status = "Publishing revision..."
             Write-Progress -Activity $Activity -Status $Status -PercentComplete 80
-            [PSObject]$PublishedRevision = $Client.PublishRevision($DatasetId, $RevisionId)
+            [PSCustomObject]$PublishedRevision = $Client.PublishRevision($DatasetId, $RevisionId)
         }
 
         # Return revision URL
@@ -355,13 +355,13 @@ function New-Dataset {
         # Create revision
         $Status = "Creating revision..."
         Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 1
-        [PSObject]$Revision = $Client.NewRevision($Name)
+        [PSCustomObject]$Revision = $Client.NewRevision($Name)
         [String]$DatasetId = $Revision.resource.fourfour
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
         # Set audience on revision
-        [PSObject]$Revision = $Client.SetAudience($DatasetId, $RevisionId, $Audience)
+        [PSCustomObject]$Revision = $Client.SetAudience($DatasetId, $RevisionId, $Audience)
 
         # Complete revision cycle and return revision URL
         Complete-Revision `
@@ -408,7 +408,7 @@ function Update-Dataset {
         # Create revision
         $Status = "Creating revision..."
         Write-Progress -Activity $MyInvocation.MyCommand -Status $Status -PercentComplete 1
-        [PSObject]$Revision = $Client.OpenRevision($DatasetId, $Type)
+        [PSCustomObject]$Revision = $Client.OpenRevision($DatasetId, $Type)
         [Int64]$RevisionId = $Revision.resource.revision_seq
         [String]$RevisionUrl = "https://$Domain/d/$DatasetId/revisions/$RevisionId"
 
@@ -430,10 +430,10 @@ function Get-Metadata {
             Get the metadata for a Socrata asset and return the response JSON.
 
         .OUTPUTS
-            PSObject
+            PSCustomObject
     #>
     [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
+    [OutputType([PSCustomObject])]
     Param(
         # URL for a Socrata domain
         [Parameter(Mandatory = $true)][String]$Domain,
@@ -458,17 +458,17 @@ function Update-Metadata {
             Update the metadata for a Socrata asset and return the response JSON.
 
         .OUTPUTS
-            PSObject
+            PSCustomObject
     #>
     [CmdletBinding(PositionalBinding = $false)]
-    [OutputType([PSObject])]
+    [OutputType([PSCustomObject])]
     Param(
         # URL for a Socrata domain
         [Parameter(Mandatory = $true)][String]$Domain,
         # Unique identifier (4x4) for an existing Socrata dataset
         [Parameter(Mandatory = $true)][ValidatePattern("^\w{4}-\w{4}$")][String]$DatasetId,
         # Object containing metadata fields to use in updating the asset
-        [Parameter(Mandatory = $true)][PSObject]$Fields,
+        [Parameter(Mandatory = $true)][PSCustomObject]$Fields,
         # Whether to simply perform validation on the input fields without modifying the asset
         [Parameter(Mandatory = $false)][Boolean]$ValidateOnly = $false,
         # Whether to perform strict validation on the input fields
