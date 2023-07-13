@@ -75,6 +75,17 @@ Describe "Socrata-PowerShell" {
         )
         $ScriptAnalysisOutput.Length | Should -BeExactly 0
     }
+
+    It "Exports only commands that are part of its public API" {
+        $ExpectedCommands = @(
+            "New-Dataset",
+            "Update-Dataset",
+            "Get-Metadata",
+            "Update-Metadata"
+        ) | Sort-Object
+        $Commands = (Get-Command -Module "Socrata").Name | Sort-Object
+        $Commands | Should -Be $ExpectedCommands
+    }
 }
 
 Describe "SocrataClient" {
