@@ -442,23 +442,11 @@ function Get-Metadata {
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
+        $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
+        $Route = "/api/views/metadata/v1/$DatasetId"
 
-        # Prepare HTTP request to get metadata
-        $MetadataUrl = "https://$Domain/api/views/metadata/v1/$DatasetId"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
-
-        # Send request and return response JSON object
-        Write-Verbose "Getting metadata: $MetadataUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Get" `
-            -Uri $MetadataUrl `
-            -Headers $Headers `
-            -ContentType "application/json"
+        Write-Verbose "Getting metadata: $Route"
+        $ResponseJson = $Client.SendRequest("Get", $Route)
         $ResponseJson
     }
 }
@@ -488,27 +476,13 @@ function Update-Metadata {
         [Parameter(Mandatory = $false)][PSCredential]$Credentials = $null
     )
     Process {
-        # Get credentials
-        $Credentials = Get-SocrataCredentials -Credentials $Credentials -ErrorAction "Stop"
-        $AuthString = Convert-SocrataCredentialsToAuthString `
-            -Credentials $Credentials `
-            -ErrorAction "Stop"
-
-        # Prepare HTTP request to update metadata
-        $BaseMetadataUrl = "https://$Domain/api/views/metadata/v1/$DatasetId"
+        $Client = New-Object SocrataClient -ArgumentList $Domain, $Credentials
+        $BaseRoute = "/api/views/metadata/v1/$DatasetId"
         $QueryString = "validateOnly=$ValidateOnly&strict=$Strict"
-        $MetadataUrl = "${BaseMetadataUrl}?${QueryString}"
-        $Headers = @{ "Authorization" = "Basic $AuthString" }
-        $Body = $Fields | ConvertTo-Json -Compress
+        $Route = "${BaseRoute}?${QueryString}"
 
-        # Send request and return response JSON object
-        Write-Verbose "Updating metadata: $MetadataUrl"
-        $ResponseJson = Invoke-RestMethod `
-            -Method "Patch" `
-            -Uri $MetadataUrl `
-            -Headers $Headers `
-            -ContentType "application/json" `
-            -Body $Body
+        Write-Verbose "Updating metadata: $Route"
+        $ResponseJson = $Client.SendRequest("Patch", $Route, $Fields)
         $ResponseJson
     }
 }
