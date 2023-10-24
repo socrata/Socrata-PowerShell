@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.3.0]
+
+* Various internal improvements, including consolidating internal API under the `SocrataClient` class.
+* Improved logging output.
+
 ## [2.2.0]
 
 * Added `Get-Metadata` and `Update-Metadata` functions for working with dataset metadata.
@@ -24,6 +29,7 @@
 
 * First major release.
 
+[2.3.0]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.3.0
 [2.2.0]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.2.0
 [2.1.2]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.1.2
 [2.1.1]: https://github.com/socrata/Socrata-PowerShell/releases/tag/2.1.1
